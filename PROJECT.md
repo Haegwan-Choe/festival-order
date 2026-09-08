@@ -206,6 +206,6 @@ REST 엔드포인트를 직접 만드는 대신, 클라이언트가 Supabase JS 
 - **프론트: Vercel** — React 프로젝트를 GitHub 연동해 git push 시 자동 배포, 무료 플랜으로 충분
 - **백엔드: Supabase** — Postgres + Auth + Realtime + Edge Function을 프로젝트 하나로 커버, 별도 서버 관리 없음
 - Supabase 무료 플랜은 **7일간 API 요청이 없으면 프로젝트가 일시정지**됨 → 행사 며칠 전부터 미리 요청을 보내 깨어있는 상태를 유지하고, 행사 당일 아침에도 한 번 더 확인
-- 환경변수(`SUPABASE_URL`, `SUPABASE_ANON_KEY`)는 Vercel 프로젝트 설정에 등록, 코드에 하드코딩 금지
+- 환경변수(`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`)는 Vercel 프로젝트 설정에 등록, 코드에 하드코딩 금지 (레거시 anon key 대신 새 publishable key 사용)
 - SPA 라우팅 새로고침 대응은 Vercel이 기본 지원 (필요 시 `vercel.json`에서 rewrites 설정)
 - 행사 당일에는 배포 변경을 최소화하고, 사전 리허설로 안정성 확인
