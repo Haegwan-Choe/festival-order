@@ -4,7 +4,7 @@
 
 - 결제 기능 없음 (현금/계좌이체 확인은 운영자가 수동으로 체크)
 - 고객 화면은 로그인 불필요, 관리자 화면(`/admin/**`)은 세션 로그인 필요 (계정은 스태프별로 여러 개 발급, 역할 구분 없이 "관리자 여부"만 판별)
-- 배포: 무료 클라우드(Railway/Render 등) 단일 서비스
+- 배포: AWS EC2 프리티어(t2/t3.micro) 단일 인스턴스, jar를 직접 올려 systemd로 상시 구동
 - 실시간 동기화: WebSocket (STOMP + SockJS)
 - DB: H2 또는 SQLite 파일 기반 (별도 DB 서버 없음)
 - 백엔드: Spring Boot, 프론트: React (빌드 결과물을 Spring Boot static 리소스로 통합해 단일 jar 배포)
@@ -224,7 +224,11 @@ PENDING_PAYMENT --(입금확인)--> COOKING --(조리완료 체크)--> SERVED
 
 ## 9. 배포 참고사항
 
-- Railway/Render 무료 플랜은 파일시스템이 비영구적일 수 있음 → H2/SQLite 파일 DB 사용 시 **Volume(영구 디스크) 부착 권장**
-- Volume 미부착 시: 배포 후 재배포/재시작 금지, 사전 리허설로 안정성 확인 필수
+- **플랫폼: AWS EC2 프리티어** (t2.micro 또는 t3.micro, 월 750시간 무료 — 인스턴스 1대 상시 구동 가능한 시간)
+  - 컨테이너형 무료 플랜(Railway/Render)과 달리 슬립(콜드스타트)이 없고, 루트 EBS 볼륨이 기본적으로 영구 저장소라 재부팅해도 H2/SQLite 파일이 보존됨 → 별도 Volume 부착 고민 불필요
+  - 단, 프리티어 조건은 계정 생성 시점에 따라 달라질 수 있으므로 AWS 콘솔에서 현재 계정의 프리티어 조건을 직접 확인
+- **배포 방식**: `./gradlew bootJar`로 만든 단일 jar를 EC2에 scp/rsync로 업로드 후 systemd 서비스로 등록해 상시 구동 (git push 자동배포 없음 — 수동 배포)
+- **네트워크/보안**: 보안 그룹에서 80/443(또는 앱 포트) 인바운드 오픈. HTTPS/WSS가 필요하면 Nginx 리버스 프록시 + Let's Encrypt 인증서 구성
 - 프론트 빌드 결과물은 Spring Boot `static` 리소스로 통합 배포 (서비스 1개로 관리, CORS 이슈 없음)
 - SPA 라우팅 새로고침 대응을 위한 fallback controller 필요 (`/order/**`, `/admin/**` → `index.html`)
+- EC2는 상시 구동이라 재시작 리스크 자체가 낮지만, 그래도 행사 당일에는 불필요한 재배포/재시작을 피하고 사전 리허설로 안정성 확인
