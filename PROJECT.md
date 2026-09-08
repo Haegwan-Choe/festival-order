@@ -114,8 +114,11 @@ REST 엔드포인트를 직접 만드는 대신, 클라이언트가 Supabase JS 
 | 입금 확인 | RPC `confirm_payment(order_id)` | `admins` 등록 여부 체크 후 order.payment_confirmed=true + 하위 order_item 전체 PENDING_PAYMENT→COOKING |
 | 조리 완료 | RPC `serve_item(item_id)` | COOKING→SERVED |
 | 퇴석 처리 | RPC `checkout_table(table_number)` | 주문 정리 + dining_table.status→EMPTY, entered_at→null (총괄 전용, 함수 내부에서 추가 권한 체크) |
+| 메뉴 추가 | RPC `create_menu_item(name, price, category)` | 새 메뉴 등록 (available=true로 시작) |
+| 메뉴 수정 | RPC `update_menu_item(id, name, price, category, available)` | 가격 변경, 품절 처리(available=false) 등 |
+| 테이블 추가 | RPC `add_dining_table(table_number)` | 행사 중 좌석을 늘려야 할 때 |
 
-> 상태를 바꾸는 모든 동작은 RPC 함수로만 가능하며, 해당 테이블에 대한 직접 INSERT/UPDATE/DELETE는 RLS로 차단한다 (5장 참고).
+> 상태를 바꾸는 모든 동작은 RPC 함수로만 가능하며, 해당 테이블에 대한 직접 INSERT/UPDATE/DELETE는 RLS로 차단한다 (5장 참고). 메뉴/테이블 삭제 RPC는 의도적으로 만들지 않음 — 메뉴는 `available=false`로 감추고, 이미 주문 이력이 걸린 데이터를 삭제하면 FK 무결성이 깨지기 때문.
 
 ---
 
