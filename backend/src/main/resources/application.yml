@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: festival-order
+  profiles:
+    active: local
+
+server:
+  port: 8080
