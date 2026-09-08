@@ -5,7 +5,7 @@
 - **2026-09-08: Spring Boot + EC2 → Vercel + Supabase로 전면 전환 결정.**
   - 기존 설계(Spring Boot 단일 jar + AWS EC2 상시 구동, STOMP/SockJS WebSocket, H2 파일 DB)는 도메인 엔티티(`DiningTable`/`MenuItem`/`Order`/`OrderItem`/`Admin`)까지 구현된 상태였음.
   - 전환 이유: 서버 직접 관리(EC2 인스턴스, systemd, 배포) 부담을 없애고, Supabase의 관계형 DB(Postgres)·내장 Realtime·Auth를 활용하면 지금 설계한 관계형 스키마와 실시간 동기화 요구사항을 더 적은 인프라로 해결할 수 있다고 판단.
-  - 트레이드오프로 감수하는 것: 서비스 로직 위치가 Java 서비스 레이어 → Postgres 함수/트리거 또는 Supabase Edge Function으로 바뀌고, 인가 방식도 Spring Security 세션 → Row Level Security(RLS) 기반으로 바뀜. 기존 `backend/`(Spring Boot) 코드는 이 전환과 함께 정리될 예정 — 과거 코드는 git 히스토리에 남아있음(전환 직전 커밋 참고).
+  - 트레이드오프로 감수하는 것: 서비스 로직 위치가 Java 서비스 레이어 → Postgres 함수(RPC) 또는 Supabase Edge Function으로 바뀌고, 인가 방식도 Spring Security 세션 → Row Level Security(RLS) 기반으로 바뀜. 기존 `backend/`(Spring Boot) 코드는 이 전환과 함께 정리됨 — 과거 코드는 git 히스토리에 남아있음(이 커밋 이전 참고).
   - 이 문서의 이후 섹션은 전환 완료 후 Vercel + Supabase 기준으로 다시 작성됨.
 
 ---
@@ -13,11 +13,11 @@
 ## 1. 개요
 
 - 결제 기능 없음 (현금/계좌이체 확인은 운영자가 수동으로 체크)
-- 고객 화면은 로그인 불필요, 관리자 화면(`/admin/**`)은 세션 로그인 필요 (계정은 스태프별로 여러 개 발급, 역할 구분 없이 "관리자 여부"만 판별)
-- 배포: AWS EC2 프리티어(t2/t3.micro) 단일 인스턴스, jar를 직접 올려 systemd로 상시 구동
-- 실시간 동기화: WebSocket (STOMP + SockJS)
-- DB: H2 또는 SQLite 파일 기반 (별도 DB 서버 없음)
-- 백엔드: Spring Boot, 프론트: React (빌드 결과물을 Spring Boot static 리소스로 통합해 단일 jar 배포)
+- 고객 화면은 로그인 불필요, 관리자 화면(`/admin/**`)은 로그인 필요 (계정은 스태프별로 여러 개 발급, 역할 구분 없이 "관리자 여부"만 판별)
+- 배포: 프론트는 Vercel, 백엔드는 별도 서버 없이 Supabase(Postgres + Auth + Realtime + Edge Function) 사용
+- 실시간 동기화: Supabase Realtime (Postgres 변경사항 구독)
+- DB: Supabase Postgres (관리형, 별도 DB 서버 구축 불필요)
+- 프론트: React, 클라이언트에서 Supabase JS SDK로 직접 데이터 조회/구독. 상태 변경(입금확인, 조리완료, 퇴석 등)은 클라이언트가 테이블을 직접 건드리지 않고 Postgres RPC 함수를 호출
 
 ---
 
@@ -25,63 +25,64 @@
 
 ```
 [고객 폰] ─┐
-           ├─ HTTPS/WSS ─→ [Spring Boot 단일 앱] ─→ [H2/SQLite 파일 DB]
-[운영자 디바이스들] ─┘
+           ├─ HTTPS ─→ [Vercel: React 정적 배포] ─┐
+[운영자 디바이스들] ─┘                              │
+                                                    ├─ Supabase JS SDK ─→ [Supabase: Postgres + Auth + Realtime + Edge Function]
+                                                    ┘
 ```
 
-- 역할(총괄/주문서버/주방) 구분은 **URL 라우팅으로만** 분리 (당일 각 디바이스에 해당 URL을 미리 열어두고 시작). 단, `/admin/**` 진입 자체는 세션 로그인 필요 — 역할 구분과 인증은 별개 축
-- 모든 화면은 하나의 WebSocket 데이터(주문 큐 스냅샷)를 공유하며, **화면별로 필터와 허용 액션만 다르게** 렌더링
+- 프론트엔드(React)만 Vercel에 정적 사이트로 배포하고, 별도 백엔드 서버는 두지 않음
+- 브라우저(고객/운영자 모두)가 Supabase JS SDK로 Postgres에 직접 읽고, Realtime으로 변경사항을 구독
+- 상태를 바꾸는 동작(입금확인, 조리완료, 퇴석, 주문 생성)은 클라이언트가 테이블을 직접 INSERT/UPDATE하지 않고 **Postgres RPC 함수**를 호출해서 서버 사이드(DB 내부)에서 원자적으로 처리 — 클라이언트가 상태를 임의로 조작(예: 입금확인 없이 조리중으로 바꾸기)하는 걸 막기 위함
+- 역할(총괄/주문서버/주방) 구분은 기존과 동일하게 **URL 라우팅으로만** 분리. 관리자 화면은 Supabase Auth 로그인 세션으로 게이트
 
 ---
 
-## 3. 도메인 모델
+## 3. 데이터 모델 (Postgres)
 
-### Table (좌석)
+### dining_table (좌석)
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| id | Long | PK |
-| tableNumber | Integer | 테이블 번호 |
-| status | Enum | EMPTY / OCCUPIED |
-| enteredAt | DateTime | 입장 시각 (최초 접속 시 기록) |
+| id | bigint | PK |
+| table_number | integer | 테이블 번호 (unique) |
+| status | table_status enum | EMPTY / OCCUPIED |
+| entered_at | timestamptz | 입장 시각 (최초 접속 시 기록) |
 
-### MenuItem (메뉴)
+### menu_item (메뉴)
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| id | Long | PK |
-| name | String | 메뉴명 |
-| price | Integer | 가격 |
-| category | String | 안주 / 음료 / 사이드 등 |
-| available | Boolean | 품절 여부 |
+| id | bigint | PK |
+| name | text | 메뉴명 |
+| price | integer | 가격 |
+| category | text | 안주 / 음료 / 사이드 등 |
+| available | boolean | 품절 여부 (기본 true) |
 
-### Order (주문)
+### orders (주문)
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| id | Long | PK |
-| tableId | Long | FK → Table |
-| createdAt | DateTime | 주문 시각 |
-| paymentConfirmed | Boolean | 입금 확인 여부 |
-| items | OrderItem[] | 주문 항목 |
+| id | bigint | PK |
+| table_id | bigint | FK → dining_table |
+| created_at | timestamptz | 주문 시각 |
+| payment_confirmed | boolean | 입금 확인 여부 |
 
-### OrderItem (주문 항목)
+### order_item (주문 항목)
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| id | Long | PK |
-| orderId | Long | FK → Order |
-| menuItemId | Long | FK → MenuItem |
-| quantity | Integer | 수량 |
-| status | Enum | PENDING_PAYMENT / COOKING / SERVED |
+| id | bigint | PK |
+| order_id | bigint | FK → orders |
+| menu_item_id | bigint | FK → menu_item |
+| quantity | integer | 수량 |
+| status | order_item_status enum | PENDING_PAYMENT / COOKING / SERVED |
 
-### Admin (관리자 계정)
+### admins (관리자 표식)
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| id | Long | PK |
-| username | String | 로그인 아이디 (unique) |
-| password | String | BCrypt 해시 |
-| displayName | String | 표시 이름 (예: "주방-김민수") |
+| id | uuid | PK, FK → auth.users(id) |
+| display_name | text | 표시 이름 (예: "주방-김민수") |
 
-> 역할(총괄/주문서버/주방) 구분은 기존대로 URL로만 하고, 계정 자체는 역할을 구분하지 않음 — "관리자냐 아니냐"만 판별. 계정은 행사 준비 단계에서 seed 데이터/관리 스크립트로 미리 발급(자체 가입 기능 없음).
+> 로그인 자격증명(아이디/비밀번호, 세션)은 **Supabase Auth**(`auth.users`)가 전담. `admins` 테이블은 "이 Supabase Auth 유저가 관리자다"라는 표식과 표시 이름만 저장 — 역할(총괄/주문서버/주방) 구분 없이 존재 여부만 판별. 계정은 행사 준비 단계에서 Supabase 대시보드/Admin API로 미리 발급(자체 가입 기능 없음).
 
-> 상태는 Order가 아니라 **OrderItem 단위**로 관리. 한 테이블이 추가 주문을 여러 번 할 수 있고, 메뉴별로 조리/서빙 타이밍이 다르기 때문.
+> 상태는 Order가 아니라 **order_item 단위**로 관리. 한 테이블이 추가 주문을 여러 번 할 수 있고, 메뉴별로 조리/서빙 타이밍이 다르기 때문.
 
 ### 상태 흐름
 ```
@@ -93,86 +94,51 @@ PENDING_PAYMENT --(입금확인)--> COOKING --(조리완료 체크)--> SERVED
 
 ---
 
-## 4. REST API
+## 4. 데이터 접근 방식 (Supabase Client Query + RPC)
 
-### 고객용 (인증 불필요)
-| Method | Path | 설명 |
+REST 엔드포인트를 직접 만드는 대신, 클라이언트가 Supabase JS SDK로 테이블을 조회하고 상태 변경은 Postgres RPC 함수(`supabase.rpc(...)`)를 호출하는 방식으로 대체한다.
+
+### 고객용 (anon key, 로그인 불필요)
+| 동작 | 방식 | 설명 |
 |---|---|---|
-| GET | `/api/tables/{tableNumber}` | 테이블 진입 처리 (최초 접속 시 status→OCCUPIED, enteredAt 기록) |
-| GET | `/api/menu` | 메뉴 목록 조회 |
-| POST | `/api/orders` | 주문 생성 `{ tableNumber, items: [{ menuItemId, quantity }] }` |
-| GET | `/api/orders/table/{tableNumber}` | 해당 테이블의 주문 내역 조회 |
+| 테이블 진입 | RPC `enter_table(table_number)` | 최초 접속 시 status→OCCUPIED, entered_at 기록 (직접 UPDATE 금지, 동시 접속 경쟁 방지 위해 RPC로 원자 처리) |
+| 메뉴 조회 | `menu_item` SELECT | RLS로 anon 조회 허용 |
+| 주문 생성 | RPC `create_order(table_number, items[])` | order + order_item을 한 트랜잭션으로 생성, status는 서버가 강제로 PENDING_PAYMENT로 설정 (클라이언트가 임의 상태로 주문 생성 불가) |
+| 주문 내역 조회 | `orders` + `order_item` + `menu_item` SELECT (table_number 필터) | RLS로 anon 조회 허용 (민감정보 아님) |
 
-### 인증 (인증 불필요 — 로그인 자체를 위한 API)
-| Method | Path | 설명 |
+### 관리자용 (Supabase Auth 로그인 필요)
+| 동작 | 방식 | 설명 |
 |---|---|---|
-| POST | `/api/auth/login` | `{ username, password }` → 성공 시 세션 생성(쿠키 발급) |
-| POST | `/api/auth/logout` | 세션 무효화 |
-| GET | `/api/auth/me` | 현재 로그인 여부 및 `displayName` 조회 (프론트 진입 시 세션 확인용) |
+| 좌석 현황 조회 | `dining_table` SELECT | 총괄 |
+| 주문 큐 조회 | `orders`+`order_item`+`menu_item` SELECT | 총괄, 주문서버, 주방 |
+| 입금 확인 | RPC `confirm_payment(order_id)` | `admins` 등록 여부 체크 후 order.payment_confirmed=true + 하위 order_item 전체 PENDING_PAYMENT→COOKING |
+| 조리 완료 | RPC `serve_item(item_id)` | COOKING→SERVED |
+| 퇴석 처리 | RPC `checkout_table(table_number)` | 주문 정리 + dining_table.status→EMPTY, entered_at→null (총괄 전용, 함수 내부에서 추가 권한 체크) |
 
-### 운영자용 (세션 인증 필요)
-| Method | Path | 설명 | 사용 화면 |
-|---|---|---|---|
-| GET | `/api/tables` | 전체 좌석 현황 | 총괄 |
-| GET | `/api/orders` | 전체 주문 큐 조회 (상태 필터 가능: `?status=`) | 총괄, 주문서버, 주방 |
-| PATCH | `/api/orders/{orderId}/payment` | 입금 확인 → 하위 OrderItem 전체 `PENDING_PAYMENT → COOKING` | 총괄, 주문서버 |
-| PATCH | `/api/order-items/{itemId}/serve` | 개별 항목 조리 완료 → `COOKING → SERVED` | 총괄, 주방 |
-| POST | `/api/tables/{tableNumber}/checkout` | 퇴석 처리 (주문 내역 정리, 좌석 EMPTY로 초기화) | 총괄 전용 |
-
-> 모든 상태 변경 API는 처리 후 WebSocket으로 최신 스냅샷을 브로드캐스트한다.
-> 운영자용 API는 미인증 요청 시 401 응답, 프론트는 이를 감지해 로그인 화면으로 이동시킨다.
+> 상태를 바꾸는 모든 동작은 RPC 함수로만 가능하며, 해당 테이블에 대한 직접 INSERT/UPDATE/DELETE는 RLS로 차단한다 (5장 참고).
 
 ---
 
-## 5. WebSocket 설계
+## 5. 실시간 동기화 설계 (Supabase Realtime)
 
-- 프로토콜: STOMP + SockJS
-- 토픽: `/topic/admin` 단일 채널 (좌석 + 주문 큐 스냅샷을 하나로 묶어서 push)
-- 이벤트 발생(주문 생성/입금확인/조리완료/퇴석) 시마다 **전체 스냅샷을 재계산해서 통째로 전송** → 클라이언트는 받은 대로 갈아끼우기만 하면 됨 (부분 업데이트 로직 불필요)
-
-### 스냅샷 JSON 예시
-```json
-{
-  "tables": [
-    { "tableNumber": 1, "status": "EMPTY", "enteredAt": null },
-    { "tableNumber": 5, "status": "OCCUPIED", "enteredAt": "2026-09-08T13:20:00" }
-  ],
-  "orders": [
-    {
-      "orderId": 101,
-      "tableNumber": 5,
-      "createdAt": "2026-09-08T13:41:00",
-      "paymentConfirmed": false,
-      "items": [
-        { "itemId": 501, "menuName": "떡볶이", "quantity": 2, "status": "PENDING_PAYMENT" },
-        { "itemId": 502, "menuName": "순대", "quantity": 1, "status": "PENDING_PAYMENT" }
-      ]
-    },
-    {
-      "orderId": 98,
-      "tableNumber": 7,
-      "createdAt": "2026-09-08T13:38:00",
-      "paymentConfirmed": true,
-      "items": [
-        { "itemId": 480, "menuName": "튀김", "quantity": 1, "status": "COOKING" }
-      ]
-    }
-  ]
-}
-```
-
-- 고객용 개별 알림(`/topic/table/{tableNumber}`)은 MVP 범위에서는 제외, 필요 시 추후 추가
-- `/topic/admin` 구독(STOMP CONNECT)도 세션 인증 필요 — SockJS는 same-origin이라 세션 쿠키가 자동 전달되므로, 서버는 handshake 시 세션 유무만 검사하면 됨. 미인증 연결은 거부.
+- 기존 STOMP/SockJS 대신 **Supabase Realtime의 `postgres_changes`** 구독을 사용
+- 관리자 화면은 `dining_table`, `orders`, `order_item` 테이블 변경 이벤트를 구독해서 로컬 상태를 갱신
+- 최초 진입 시에는 SELECT로 전체 스냅샷을 한 번 가져오고, 이후에는 변경 이벤트로 증분 갱신 (재연결 시에는 다시 전체 SELECT로 정합성을 맞춘 뒤 구독 재개)
+- 고객용 개별 알림은 MVP 범위에서는 제외 — 고객은 자기 테이블 주문 내역을 폴링 또는 동일한 Realtime 구독(테이블 필터)으로 확인 가능하도록 추후 확장 여지 있음
 
 ---
 
-## 6. 인증/보안 설계
+## 6. 인증/보안 설계 (Supabase Auth + RLS)
 
-- 관리자 계정은 여러 개(스태프별) 발급하되, **역할 구분 없이 "관리자 여부"만 판별** — 역할(총괄/주문서버/주방) 구분은 기존과 동일하게 URL로만 유지
-- 세션 기반 인증(Spring Security + `HttpSession`): 로그인 성공 시 세션 쿠키 발급, 이후 `/admin/**` 페이지 및 운영자 API 요청은 세션으로 인증
-- 비밀번호는 BCrypt로 해시하여 DB에 저장. 회원가입 화면은 없음 — 계정은 행사 전 seed 데이터 또는 별도 관리 스크립트로 미리 생성
-- 미인증 상태로 `/admin/**` 접근 시 프론트에서 로그인 화면으로 리다이렉트, 운영자 API 요청 시 서버는 401 반환
-- 고객 화면(`/order/**`)과 고객 API는 인증 예외 대상 유지
+- 관리자 계정은 **Supabase Auth**로 이메일/비밀번호 생성 (자체 회원가입 화면 없음, 행사 전 Supabase 대시보드/Admin API로 스태프별 계정 미리 발급)
+- 로그인에 성공한 Auth 유저 중 `admins` 테이블에 등록된 유저만 "관리자"로 인정 — 역할(총괄/주문서버/주방) 구분은 기존과 동일하게 URL로만 유지
+- **RLS(Row Level Security) 정책 원칙**
+  - SELECT: `dining_table`/`orders`/`order_item`/`menu_item`은 anon 포함 누구나 조회 가능 (민감정보 아님)
+  - INSERT/UPDATE/DELETE: 테이블에 대한 직접 쓰기는 전부 차단, 오직 RPC 함수(SECURITY DEFINER)를 통해서만 상태 변경 허용
+  - RPC 함수 내부에서 관리자 전용 동작(`confirm_payment`, `serve_item`, `checkout_table`)은 `auth.uid()`가 `admins` 테이블에 존재하는지 확인 후 처리, 아니면 예외 발생
+- 미인증 상태로 관리자 화면(`/admin/**`) 접근 시 프론트 라우팅 가드가 로그인 화면으로 리다이렉트, RPC 호출 시에도 서버(DB) 단에서 이중으로 권한 체크
+- 고객 화면(`/order/**`)과 고객용 RPC/조회는 인증 예외 대상 유지
+- 세부 RLS 정책/RPC 함수 SQL은 별도 `supabase/` 마이그레이션 작업에서 구체화 예정
 
 ---
 
@@ -186,7 +152,7 @@ PENDING_PAYMENT --(입금확인)--> COOKING --(조리완료 체크)--> SERVED
 /admin/kitchen            → 주방 (폰, 로그인 필요)
 ```
 
-역할별(총괄/주문서버/주방) 구분은 기존대로 URL로만 하되, `/admin/**` 진입 시 세션 미인증이면 `/admin/login`으로 리다이렉트. 로그인 후에는 각 디바이스가 원래 열어두려던 URL로 이동해 그대로 사용.
+역할별(총괄/주문서버/주방) 구분은 기존대로 URL로만 하되, `/admin/**` 진입 시 Supabase Auth 세션이 없으면 `/admin/login`으로 리다이렉트. 로그인 후에는 각 디바이스가 원래 열어두려던 URL로 이동해 그대로 사용.
 
 ### 7-1. 고객 화면 (`/order/{tableNumber}`)
 1. **입장 화면**: 테이블 번호 확인 → "주문하러 가기" (재접속 시 스킵)
@@ -225,20 +191,18 @@ PENDING_PAYMENT --(입금확인)--> COOKING --(조리완료 체크)--> SERVED
 
 ## 8. 확장성 메모 (추후 반영 가능하도록 남겨둔 여지)
 
-- `boothId` 필드를 Table/MenuItem에 미리 추가해두면, 여러 부스가 같은 시스템을 재사용할 때 확장 쉬움 (지금은 단일 부스 고정값)
-- Order 상태 enum은 지금은 `paymentConfirmed(boolean) + OrderItem.status`로 단순화했지만, 추후 실제 결제 붙일 경우 `PAID`, `REFUNDED` 등 상태 추가 여지 있음
-- Service Layer에 비즈니스 로직(퇴석 시 정리, 스냅샷 계산 등) 캡슐화, Controller는 얇게 유지
-- 관리자 계정에 역할 필드(예: `role`)를 추가하면, 추후 화면별 세부 권한 분리(예: 주방 계정은 총괄 화면 접근 불가)로 확장 가능 (지금은 "관리자 여부"만 판별)
+- `booth_id` 필드를 dining_table/menu_item에 미리 추가해두면, 여러 부스가 같은 시스템을 재사용할 때 확장 쉬움 (지금은 단일 부스 고정값)
+- Order 상태는 지금은 `payment_confirmed(boolean) + order_item.status`로 단순화했지만, 추후 실제 결제 붙일 경우 `PAID`, `REFUNDED` 등 상태 추가 여지 있음
+- 상태 변경 로직은 Postgres RPC 함수에 캡슐화, 프론트는 RPC 호출만 하는 얇은 클라이언트로 유지
+- `admins` 테이블에 역할 필드(예: `role`)를 추가하면, 추후 화면별 세부 권한 분리(예: 주방 계정은 총괄 화면 접근 불가)로 확장 가능 (지금은 "관리자 여부"만 판별)
 
 ---
 
 ## 9. 배포 참고사항
 
-- **플랫폼: AWS EC2 프리티어** (t2.micro 또는 t3.micro, 월 750시간 무료 — 인스턴스 1대 상시 구동 가능한 시간)
-  - 컨테이너형 무료 플랜(Railway/Render)과 달리 슬립(콜드스타트)이 없고, 루트 EBS 볼륨이 기본적으로 영구 저장소라 재부팅해도 H2/SQLite 파일이 보존됨 → 별도 Volume 부착 고민 불필요
-  - 단, 프리티어 조건은 계정 생성 시점에 따라 달라질 수 있으므로 AWS 콘솔에서 현재 계정의 프리티어 조건을 직접 확인
-- **배포 방식**: `./gradlew bootJar`로 만든 단일 jar를 EC2에 scp/rsync로 업로드 후 systemd 서비스로 등록해 상시 구동 (git push 자동배포 없음 — 수동 배포)
-- **네트워크/보안**: 보안 그룹에서 80/443(또는 앱 포트) 인바운드 오픈. HTTPS/WSS가 필요하면 Nginx 리버스 프록시 + Let's Encrypt 인증서 구성
-- 프론트 빌드 결과물은 Spring Boot `static` 리소스로 통합 배포 (서비스 1개로 관리, CORS 이슈 없음)
-- SPA 라우팅 새로고침 대응을 위한 fallback controller 필요 (`/order/**`, `/admin/**` → `index.html`)
-- EC2는 상시 구동이라 재시작 리스크 자체가 낮지만, 그래도 행사 당일에는 불필요한 재배포/재시작을 피하고 사전 리허설로 안정성 확인
+- **프론트: Vercel** — React 프로젝트를 GitHub 연동해 git push 시 자동 배포, 무료 플랜으로 충분
+- **백엔드: Supabase** — Postgres + Auth + Realtime + Edge Function을 프로젝트 하나로 커버, 별도 서버 관리 없음
+- Supabase 무료 플랜은 **7일간 API 요청이 없으면 프로젝트가 일시정지**됨 → 행사 며칠 전부터 미리 요청을 보내 깨어있는 상태를 유지하고, 행사 당일 아침에도 한 번 더 확인
+- 환경변수(`SUPABASE_URL`, `SUPABASE_ANON_KEY`)는 Vercel 프로젝트 설정에 등록, 코드에 하드코딩 금지
+- SPA 라우팅 새로고침 대응은 Vercel이 기본 지원 (필요 시 `vercel.json`에서 rewrites 설정)
+- 행사 당일에는 배포 변경을 최소화하고, 사전 리허설로 안정성 확인
