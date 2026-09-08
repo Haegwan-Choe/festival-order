@@ -1,5 +1,15 @@
 # 학교 축제 주점 주문 웹 서비스 — 설계 문서
 
+## 0. 아키텍처 변경 이력
+
+- **2026-09-08: Spring Boot + EC2 → Vercel + Supabase로 전면 전환 결정.**
+  - 기존 설계(Spring Boot 단일 jar + AWS EC2 상시 구동, STOMP/SockJS WebSocket, H2 파일 DB)는 도메인 엔티티(`DiningTable`/`MenuItem`/`Order`/`OrderItem`/`Admin`)까지 구현된 상태였음.
+  - 전환 이유: 서버 직접 관리(EC2 인스턴스, systemd, 배포) 부담을 없애고, Supabase의 관계형 DB(Postgres)·내장 Realtime·Auth를 활용하면 지금 설계한 관계형 스키마와 실시간 동기화 요구사항을 더 적은 인프라로 해결할 수 있다고 판단.
+  - 트레이드오프로 감수하는 것: 서비스 로직 위치가 Java 서비스 레이어 → Postgres 함수/트리거 또는 Supabase Edge Function으로 바뀌고, 인가 방식도 Spring Security 세션 → Row Level Security(RLS) 기반으로 바뀜. 기존 `backend/`(Spring Boot) 코드는 이 전환과 함께 정리될 예정 — 과거 코드는 git 히스토리에 남아있음(전환 직전 커밋 참고).
+  - 이 문서의 이후 섹션은 전환 완료 후 Vercel + Supabase 기준으로 다시 작성됨.
+
+---
+
 ## 1. 개요
 
 - 결제 기능 없음 (현금/계좌이체 확인은 운영자가 수동으로 체크)
