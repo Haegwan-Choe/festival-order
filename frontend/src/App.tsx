@@ -13,7 +13,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="/order/:tableNumber" element={<OrderPage />} />
+          <Route path="/order/:tableLabel" element={<OrderPage />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route element={<RequireAdmin />}>
             <Route element={<AdminLayout />}>

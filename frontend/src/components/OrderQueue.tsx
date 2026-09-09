@@ -54,7 +54,7 @@ export function OrderQueue({
         return (
           <Card key={order.orderId}>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">{order.tableNumber}번 테이블</CardTitle>
+              <CardTitle className="text-base">{order.tableLabel} 테이블</CardTitle>
               <span className="text-xs text-muted-foreground">{formatTime(order.createdAt)}</span>
             </CardHeader>
             <CardContent className="space-y-3">
