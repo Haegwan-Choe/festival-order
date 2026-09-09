@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 import type { OrderItemStatus, OrderView } from '@/types/domain'
 
 type OrderQueueAction = 'confirmPayment' | 'markServed'
@@ -16,6 +17,12 @@ const STATUS_ICON: Record<OrderItemStatus, string> = {
   PENDING_PAYMENT: '🟠',
   COOKING: '🔥',
   SERVED: '✅',
+}
+
+const STATUS_BLOCK_STYLE: Record<OrderItemStatus, string> = {
+  PENDING_PAYMENT: 'border-amber-200 bg-amber-50 text-amber-900',
+  COOKING: 'border-orange-200 bg-orange-50 text-orange-900',
+  SERVED: 'border-emerald-200 bg-emerald-50 text-emerald-900',
 }
 
 function formatTime(iso: string) {
@@ -60,7 +67,13 @@ export function OrderQueue({
             <CardContent className="space-y-3">
               <ul className="space-y-1.5">
                 {order.items.map((item) => (
-                  <li key={item.itemId} className="flex items-center justify-between text-sm">
+                  <li
+                    key={item.itemId}
+                    className={cn(
+                      'flex items-center justify-between rounded-md border px-3 py-2 text-sm',
+                      STATUS_BLOCK_STYLE[item.status],
+                    )}
+                  >
                     <span>
                       {STATUS_ICON[item.status]} {item.menuName} x{item.quantity}
                     </span>

@@ -67,4 +67,10 @@ export const mockOrders: OrderView[] = [
     createdAt: minutesAgo(35),
     items: [{ itemId: 470, menuName: '치킨', quantity: 1, status: 'COOKING' }],
   },
+  {
+    orderId: 90,
+    tableLabel: formatTableLabel('A', 6),
+    createdAt: minutesAgo(45),
+    items: [{ itemId: 460, menuName: '감자튀김', quantity: 1, status: 'SERVED' }],
+  },
 ]

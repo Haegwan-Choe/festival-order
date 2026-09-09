@@ -19,7 +19,7 @@ export default function AdminOverview() {
         <h2 className="text-sm font-medium text-muted-foreground">주문 큐</h2>
         <OrderQueue
           orders={mockOrders}
-          filterStatus={['PENDING_PAYMENT', 'COOKING']}
+          filterStatus={['PENDING_PAYMENT', 'COOKING', 'SERVED']}
           allowedActions={['confirmPayment', 'markServed']}
           onConfirmPayment={(orderId) => console.log('confirmPayment', orderId)}
           onMarkServed={(itemId) => console.log('markServed', itemId)}

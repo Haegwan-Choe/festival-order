@@ -5,7 +5,7 @@ export default function AdminOrders() {
   return (
     <OrderQueue
       orders={mockOrders}
-      filterStatus={['PENDING_PAYMENT', 'COOKING']}
+      filterStatus={['PENDING_PAYMENT', 'COOKING', 'SERVED']}
       allowedActions={['confirmPayment']}
       onConfirmPayment={(orderId) => console.log('confirmPayment', orderId)}
     />
