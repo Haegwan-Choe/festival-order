@@ -10,6 +10,7 @@ interface OrderRow {
     id: number
     quantity: number
     status: OrderItemStatus
+    served_at: string | null
     menu_item: { name: string } | null
   }>
 }
@@ -26,6 +27,7 @@ function mapRow(row: OrderRow): OrderView | null {
       menuName: item.menu_item?.name ?? '(삭제된 메뉴)',
       quantity: item.quantity,
       status: item.status,
+      servedAt: item.served_at,
     })),
   }
 }
@@ -37,7 +39,9 @@ export function useOrderQueue() {
   const refetch = useCallback(async () => {
     const { data, error } = await supabase
       .from('orders')
-      .select('id, created_at, dining_table(zone, seat_number), order_item(id, quantity, status, menu_item(name))')
+      .select(
+        'id, created_at, dining_table(zone, seat_number), order_item(id, quantity, status, served_at, menu_item(name))',
+      )
       .order('created_at', { ascending: false })
 
     if (error) {

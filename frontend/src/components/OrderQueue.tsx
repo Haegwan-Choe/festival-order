@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -28,24 +28,24 @@ export function OrderQueue({
   onConfirmPayment,
   onMarkServed,
 }: OrderQueueProps) {
-  const [hiddenOrderIds, setHiddenOrderIds] = useState<Set<number>>(new Set())
-  const scheduledRef = useRef<Set<number>>(new Set())
-
-  // 한 주문의 모든 항목이 SERVED가 되면 5초 뒤 큐에서 자동으로 치운다.
+  // 브라우저 로컬 타이머 대신 서버에 기록된 served_at을 기준으로 계산 —
+  // 그래야 새로고침하거나 다른 화면으로 갔다 와도 "완료된 지 얼마나 됐는지"가 유지된다.
+  const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    orders.forEach((order) => {
-      const fullyServed = order.items.length > 0 && order.items.every((item) => item.status === 'SERVED')
-      if (fullyServed && !scheduledRef.current.has(order.orderId)) {
-        scheduledRef.current.add(order.orderId)
-        setTimeout(() => {
-          setHiddenOrderIds((prev) => new Set(prev).add(order.orderId))
-        }, HIDE_AFTER_SERVED_MS)
-      }
-    })
-  }, [orders])
+    const id = setInterval(() => setNow(Date.now()), 5_000)
+    return () => clearInterval(id)
+  }, [])
+
+  function isFullyServedAndExpired(order: OrderView) {
+    if (order.items.length === 0 || !order.items.every((item) => item.status === 'SERVED')) return false
+    const servedTimes = order.items.map((item) => (item.servedAt ? new Date(item.servedAt).getTime() : 0))
+    const lastServedAt = Math.max(...servedTimes)
+    if (!lastServedAt) return false
+    return now - lastServedAt > HIDE_AFTER_SERVED_MS
+  }
 
   const visibleOrders = orders
-    .filter((order) => !hiddenOrderIds.has(order.orderId))
+    .filter((order) => !isFullyServedAndExpired(order))
     .map((order) => ({
       ...order,
       items: order.items.filter((item) => filterStatus.includes(item.status)),
