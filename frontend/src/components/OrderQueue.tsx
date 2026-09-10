@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -14,6 +15,8 @@ interface OrderQueueProps {
   onMarkServed?: (itemId: number) => void
 }
 
+const HIDE_AFTER_SERVED_MS = 3 * 60_000
+
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
 }
@@ -25,7 +28,24 @@ export function OrderQueue({
   onConfirmPayment,
   onMarkServed,
 }: OrderQueueProps) {
+  const [hiddenOrderIds, setHiddenOrderIds] = useState<Set<number>>(new Set())
+  const scheduledRef = useRef<Set<number>>(new Set())
+
+  // 한 주문의 모든 항목이 SERVED가 되면 5초 뒤 큐에서 자동으로 치운다.
+  useEffect(() => {
+    orders.forEach((order) => {
+      const fullyServed = order.items.length > 0 && order.items.every((item) => item.status === 'SERVED')
+      if (fullyServed && !scheduledRef.current.has(order.orderId)) {
+        scheduledRef.current.add(order.orderId)
+        setTimeout(() => {
+          setHiddenOrderIds((prev) => new Set(prev).add(order.orderId))
+        }, HIDE_AFTER_SERVED_MS)
+      }
+    })
+  }, [orders])
+
   const visibleOrders = orders
+    .filter((order) => !hiddenOrderIds.has(order.orderId))
     .map((order) => ({
       ...order,
       items: order.items.filter((item) => filterStatus.includes(item.status)),
@@ -67,7 +87,7 @@ export function OrderQueue({
                       {STATUS_ICON[item.status]} {item.menuName} x{item.quantity}
                     </span>
                     {allowedActions.includes('markServed') && item.status === 'COOKING' && (
-                      <Button size="sm" variant="outline" onClick={() => onMarkServed?.(item.itemId)}>
+                      <Button size="lg" variant="outline" onClick={() => onMarkServed?.(item.itemId)}>
                         조리완료
                       </Button>
                     )}
@@ -75,7 +95,7 @@ export function OrderQueue({
                 ))}
               </ul>
               {allowedActions.includes('confirmPayment') && hasPending && (
-                <Button size="sm" onClick={() => onConfirmPayment?.(order.orderId)}>
+                <Button size="lg" className="w-full" onClick={() => onConfirmPayment?.(order.orderId)}>
                   입금 확인
                 </Button>
               )}
