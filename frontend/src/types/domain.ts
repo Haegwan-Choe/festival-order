@@ -12,6 +12,15 @@ export interface DiningTable {
   groupId: number | null
 }
 
+export interface MenuItem {
+  id: number
+  name: string
+  price: number
+  category: string
+  available: boolean
+  imageUrl: string | null
+}
+
 export interface OrderItemView {
   itemId: number
   menuName: string

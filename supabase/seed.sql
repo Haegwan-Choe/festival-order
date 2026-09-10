@@ -18,15 +18,15 @@ insert into dining_table (zone, seat_number, status, grid_row, grid_col) values
   ('B', 9, 'EMPTY', 0, 0), ('B', 10, 'EMPTY', 0, 1), ('B', 11, 'EMPTY', 0, 2), ('B', 12, 'EMPTY', 0, 3),
   ('B', 13, 'EMPTY', 0, 5), ('B', 14, 'EMPTY', 0, 6), ('B', 15, 'EMPTY', 0, 7), ('B', 16, 'EMPTY', 0, 8);
 
--- 샘플 메뉴 (카테고리: 안주 / 음료 / 사이드)
+-- 샘플 메뉴 (카테고리: 안주 / 사이드 / 밈)
 insert into menu_item (name, price, category, available) values
   ('떡볶이', 15000, '안주', true),
   ('순대', 13000, '안주', true),
   ('튀김모듬', 15000, '안주', true),
   ('치킨', 18000, '안주', true),
-  ('사이다', 2000, '음료', true),
-  ('콜라', 2000, '음료', true),
-  ('생수', 1000, '음료', true),
+  ('사이다', 2000, '밈', true),
+  ('콜라', 2000, '밈', true),
+  ('생수', 1000, '밈', true),
   ('감자튀김', 8000, '사이드', true);
 
 -- admins 시드는 넣지 않음: auth.users에 실제 계정이 먼저 생성돼야
