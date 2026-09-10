@@ -50,7 +50,7 @@ export default function AdminLogin() {
     <div className="flex min-h-dvh items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>관리자 로그인</CardTitle>
+          <CardTitle>밈천지 관리자 로그인</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
