@@ -79,7 +79,7 @@ export function SeatGrid({ tables, onCheckout, onMove, onMerge }: SeatGridProps)
   const zones = [...new Set(tables.map((table) => table.zone))].sort()
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-auto pb-2">
       {zones.map((zone) => {
         const zoneTables = tables.filter((table) => table.zone === zone)
         const maxRow = Math.max(0, ...zoneTables.map((table) => table.gridRow))
@@ -90,10 +90,7 @@ export function SeatGrid({ tables, onCheckout, onMove, onMerge }: SeatGridProps)
         return (
           <div key={zone} className="space-y-2">
             <h3 className="text-xs font-medium text-muted-foreground">{zone}구역</h3>
-            <div
-              className="grid gap-2"
-              style={{ gridTemplateColumns: `repeat(${cols}, minmax(2.75rem, 1fr))` }}
-            >
+            <div className="grid w-max gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 3rem)` }}>
               {Array.from({ length: rows * cols }).map((_, idx) => {
                 const row = Math.floor(idx / cols)
                 const col = idx % cols

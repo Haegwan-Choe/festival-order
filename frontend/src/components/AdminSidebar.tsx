@@ -32,7 +32,7 @@ export function AdminSidebar({ open, onClose }: AdminSidebarProps) {
               onClick={onClose}
               className={({ isActive }) =>
                 cn(
-                  'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  'block rounded-md px-3 py-2.5 text-lg font-medium transition-colors',
                   isActive
                     ? 'bg-accent text-accent-foreground'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground',

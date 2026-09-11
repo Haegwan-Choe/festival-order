@@ -1,7 +1,7 @@
 import { ImageIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import type { MenuItem } from '@/types/domain'
@@ -29,12 +29,12 @@ export function MenuView({ menu, cart, onAdd, onRemove, onViewCart }: MenuViewPr
   return (
     <div className="min-h-dvh pb-28">
       <div className="p-4">
-        <p className="text-sm text-muted-foreground">밈천지</p>
-        <h1 className="text-lg font-semibold">메뉴</h1>
+        <h1 className="text-2xl font-black tracking-tight">밈천지</h1>
+        <p className="text-sm text-muted-foreground">메뉴</p>
       </div>
 
       <Tabs defaultValue={categories[0]} className="px-4">
-        <TabsList>
+        <TabsList className="w-full">
           {categories.map((category) => (
             <TabsTrigger key={category} value={category}>
               {category}
@@ -49,47 +49,49 @@ export function MenuView({ menu, cart, onAdd, onRemove, onViewCart }: MenuViewPr
               .map((item) => {
                 const quantity = cart[item.id] ?? 0
                 return (
-                  <Card key={item.id} className={cn(!item.available && 'opacity-50')}>
-                    <CardContent className="flex items-center gap-3 py-3">
+                  <Card key={item.id} className={cn('overflow-hidden py-0', !item.available && 'opacity-50')}>
+                    <div className="flex h-28">
                       {item.imageUrl ? (
                         <img
                           src={item.imageUrl}
                           alt={item.name}
-                          className="size-14 shrink-0 rounded-md object-cover"
+                          className="aspect-square h-full shrink-0 object-cover"
                         />
                       ) : (
-                        <div className="flex size-14 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                          <ImageIcon className="size-5" />
+                        <div className="flex aspect-square h-full shrink-0 items-center justify-center bg-muted text-muted-foreground">
+                          <ImageIcon className="size-7" />
                         </div>
                       )}
-                      <div className="flex-1">
-                        <p className="font-medium">
-                          {item.name}
-                          {!item.available && (
-                            <Badge variant="secondary" className="ml-2">
-                              품절
-                            </Badge>
-                          )}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{item.price.toLocaleString()}원</p>
+                      <div className="flex flex-1 items-center justify-between gap-2 px-3">
+                        <div>
+                          <p className="font-medium">
+                            {item.name}
+                            {!item.available && (
+                              <Badge variant="secondary" className="ml-2">
+                                품절
+                              </Badge>
+                            )}
+                          </p>
+                          <p className="text-sm text-muted-foreground">{item.price.toLocaleString()}원</p>
+                        </div>
+                        {item.available &&
+                          (quantity === 0 ? (
+                            <Button size="lg" onClick={() => onAdd(item.id)}>
+                              담기
+                            </Button>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Button size="icon-lg" variant="outline" onClick={() => onRemove(item.id)}>
+                                −
+                              </Button>
+                              <span className="w-5 text-center">{quantity}</span>
+                              <Button size="icon-lg" variant="outline" onClick={() => onAdd(item.id)}>
+                                +
+                              </Button>
+                            </div>
+                          ))}
                       </div>
-                      {item.available &&
-                        (quantity === 0 ? (
-                          <Button size="sm" onClick={() => onAdd(item.id)}>
-                            담기
-                          </Button>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <Button size="icon" variant="outline" onClick={() => onRemove(item.id)}>
-                              −
-                            </Button>
-                            <span className="w-4 text-center">{quantity}</span>
-                            <Button size="icon" variant="outline" onClick={() => onAdd(item.id)}>
-                              +
-                            </Button>
-                          </div>
-                        ))}
-                    </CardContent>
+                    </div>
                   </Card>
                 )
               })}
