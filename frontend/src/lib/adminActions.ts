@@ -35,3 +35,37 @@ export async function mergeTables(tables: DiningTable[]) {
   })
   if (error) throw error
 }
+
+export async function createMenuItem(params: {
+  name: string
+  price: number
+  category: string
+  imageUrl: string | null
+}) {
+  const { error } = await supabase.rpc('create_menu_item', {
+    p_name: params.name,
+    p_price: params.price,
+    p_category: params.category,
+    p_image_url: params.imageUrl,
+  })
+  if (error) throw error
+}
+
+export async function updateMenuItem(params: {
+  id: number
+  name: string
+  price: number
+  category: string
+  available: boolean
+  imageUrl: string | null
+}) {
+  const { error } = await supabase.rpc('update_menu_item', {
+    p_id: params.id,
+    p_name: params.name,
+    p_price: params.price,
+    p_category: params.category,
+    p_available: params.available,
+    p_image_url: params.imageUrl,
+  })
+  if (error) throw error
+}
