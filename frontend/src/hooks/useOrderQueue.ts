@@ -5,6 +5,7 @@ import { formatTableLabel, type OrderItemStatus, type OrderView } from '@/types/
 interface OrderRow {
   id: number
   created_at: string
+  dismissed_at: string | null
   dining_table: { zone: string; seat_number: number } | null
   order_item: Array<{
     id: number
@@ -22,6 +23,7 @@ function mapRow(row: OrderRow): OrderView | null {
     orderId: row.id,
     tableLabel: formatTableLabel(row.dining_table.zone, row.dining_table.seat_number),
     createdAt: row.created_at,
+    dismissedAt: row.dismissed_at,
     items: row.order_item.map((item) => ({
       itemId: item.id,
       menuName: item.menu_item?.name ?? '(삭제된 메뉴)',
@@ -40,7 +42,7 @@ export function useOrderQueue() {
     const { data, error } = await supabase
       .from('orders')
       .select(
-        'id, created_at, dining_table(zone, seat_number), order_item(id, quantity, status, served_at, menu_item(name))',
+        'id, created_at, dismissed_at, dining_table(zone, seat_number), order_item(id, quantity, status, served_at, menu_item(name))',
       )
       .order('created_at', { ascending: false })
 

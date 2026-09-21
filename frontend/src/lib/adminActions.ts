@@ -11,6 +11,11 @@ export async function markServed(itemId: number) {
   if (error) throw error
 }
 
+export async function dismissOrder(orderId: number) {
+  const { error } = await supabase.rpc('dismiss_order', { p_order_id: orderId })
+  if (error) throw error
+}
+
 export async function checkoutTable(table: DiningTable) {
   const { error } = await supabase.rpc('checkout_table', {
     p_zone: table.zone,

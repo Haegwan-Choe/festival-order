@@ -2,7 +2,14 @@ import { OrderQueue } from '@/components/OrderQueue'
 import { SeatGrid } from '@/components/SeatGrid'
 import { useDiningTables } from '@/hooks/useDiningTables'
 import { useOrderQueue } from '@/hooks/useOrderQueue'
-import { checkoutTable, confirmPayment, markServed, mergeTables, moveTable } from '@/lib/adminActions'
+import {
+  checkoutTable,
+  confirmPayment,
+  dismissOrder,
+  markServed,
+  mergeTables,
+  moveTable,
+} from '@/lib/adminActions'
 
 export default function AdminOverview() {
   const { tables, loading: tablesLoading } = useDiningTables()
@@ -32,9 +39,10 @@ export default function AdminOverview() {
           <OrderQueue
             orders={orders}
             filterStatus={['PENDING_PAYMENT', 'COOKING', 'SERVED']}
-            allowedActions={['confirmPayment', 'markServed']}
+            allowedActions={['confirmPayment', 'markServed', 'dismissOrder']}
             onConfirmPayment={(orderId) => confirmPayment(orderId).catch((e) => alert(e.message))}
             onMarkServed={(itemId) => markServed(itemId).catch((e) => alert(e.message))}
+            onDismissOrder={(orderId) => dismissOrder(orderId).catch((e) => alert(e.message))}
           />
         )}
       </section>

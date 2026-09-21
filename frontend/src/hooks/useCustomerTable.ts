@@ -16,6 +16,7 @@ interface DiningTableRow {
 interface OrderRow {
   id: number
   created_at: string
+  dismissed_at: string | null
   order_item: Array<{
     id: number
     quantity: number
@@ -62,7 +63,7 @@ export function useCustomerTable(zone: string, seatNumber: number) {
 
     const { data: orderRows, error: ordersError } = await supabase
       .from('orders')
-      .select('id, created_at, order_item(id, quantity, status, served_at, menu_item(name))')
+      .select('id, created_at, dismissed_at, order_item(id, quantity, status, served_at, menu_item(name))')
       .eq('table_id', row.id)
       .order('created_at', { ascending: false })
 
@@ -74,6 +75,7 @@ export function useCustomerTable(zone: string, seatNumber: number) {
           orderId: order.id,
           tableLabel: `${row.zone}-${row.seat_number}`,
           createdAt: order.created_at,
+          dismissedAt: order.dismissed_at,
           items: order.order_item.map((item) => ({
             itemId: item.id,
             menuName: item.menu_item?.name ?? '(삭제된 메뉴)',

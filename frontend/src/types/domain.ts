@@ -33,6 +33,7 @@ export interface OrderView {
   orderId: number
   tableLabel: string
   createdAt: string
+  dismissedAt: string | null
   items: OrderItemView[]
 }
 

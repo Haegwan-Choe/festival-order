@@ -1,11 +1,22 @@
+import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { STATUS_BLOCK_STYLE, STATUS_ICON } from '@/lib/orderStatusStyle'
 import type { OrderItemStatus, OrderView } from '@/types/domain'
 
-type OrderQueueAction = 'confirmPayment' | 'markServed'
+type OrderQueueAction = 'confirmPayment' | 'markServed' | 'dismissOrder'
 
 interface OrderQueueProps {
   orders: OrderView[]
@@ -13,6 +24,7 @@ interface OrderQueueProps {
   allowedActions: OrderQueueAction[]
   onConfirmPayment?: (orderId: number) => void
   onMarkServed?: (itemId: number) => void
+  onDismissOrder?: (orderId: number) => void
 }
 
 const HIDE_AFTER_SERVED_MS = 3 * 60_000
@@ -27,17 +39,23 @@ export function OrderQueue({
   allowedActions,
   onConfirmPayment,
   onMarkServed,
+  onDismissOrder,
 }: OrderQueueProps) {
   // 브라우저 로컬 타이머 대신 서버에 기록된 served_at을 기준으로 계산 —
   // 그래야 새로고침하거나 다른 화면으로 갔다 와도 "완료된 지 얼마나 됐는지"가 유지된다.
   const [now, setNow] = useState(() => Date.now())
+  const [pendingDismiss, setPendingDismiss] = useState<{ orderId: number; tableLabel: string } | null>(null)
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 5_000)
     return () => clearInterval(id)
   }, [])
 
+  function isFullyServed(order: OrderView) {
+    return order.items.length > 0 && order.items.every((item) => item.status === 'SERVED')
+  }
+
   function isFullyServedAndExpired(order: OrderView) {
-    if (order.items.length === 0 || !order.items.every((item) => item.status === 'SERVED')) return false
+    if (!isFullyServed(order)) return false
     const servedTimes = order.items.map((item) => (item.servedAt ? new Date(item.servedAt).getTime() : 0))
     const lastServedAt = Math.max(...servedTimes)
     if (!lastServedAt) return false
@@ -45,9 +63,10 @@ export function OrderQueue({
   }
 
   const visibleOrders = orders
-    .filter((order) => !isFullyServedAndExpired(order))
+    .filter((order) => order.dismissedAt === null && !isFullyServedAndExpired(order))
     .map((order) => ({
       ...order,
+      fullyServed: isFullyServed(order),
       items: order.items.filter((item) => filterStatus.includes(item.status)),
     }))
     .filter((order) => order.items.length > 0)
@@ -71,7 +90,19 @@ export function OrderQueue({
           <Card key={order.orderId}>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base">{order.tableLabel} 테이블</CardTitle>
-              <span className="text-xs text-muted-foreground">{formatTime(order.createdAt)}</span>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground">{formatTime(order.createdAt)}</span>
+                {allowedActions.includes('dismissOrder') && order.fullyServed && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="목록에서 지우기"
+                    onClick={() => setPendingDismiss({ orderId: order.orderId, tableLabel: order.tableLabel })}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <ul className="space-y-1.5">
@@ -103,6 +134,28 @@ export function OrderQueue({
           </Card>
         )
       })}
+
+      <AlertDialog open={pendingDismiss !== null} onOpenChange={(open) => !open && setPendingDismiss(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{pendingDismiss?.tableLabel} 테이블 주문을 목록에서 지울까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              모든 화면의 주문 목록에서 사라집니다. 주문 기록 자체는 퇴석 처리 전까지 남아있어요.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingDismiss) onDismissOrder?.(pendingDismiss.orderId)
+                setPendingDismiss(null)
+              }}
+            >
+              지우기
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
