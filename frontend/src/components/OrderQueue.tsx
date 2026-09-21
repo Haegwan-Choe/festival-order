@@ -55,7 +55,7 @@ export function OrderQueue({
       const aPending = a.items.some((item) => item.status === 'PENDING_PAYMENT')
       const bPending = b.items.some((item) => item.status === 'PENDING_PAYMENT')
       if (aPending !== bPending) return aPending ? -1 : 1
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     })
 
   if (visibleOrders.length === 0) {
