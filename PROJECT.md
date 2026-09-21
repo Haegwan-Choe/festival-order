@@ -153,6 +153,8 @@ REST 엔드포인트를 직접 만드는 대신, 클라이언트가 Supabase JS 
 /admin/overview          → 총괄 (노트북, 반응형, 로그인 필요)
 /admin/orders            → 주문받는 서버 (폰, 로그인 필요)
 /admin/kitchen            → 주방 (폰, 로그인 필요)
+/admin/history            → 주문 내역 (X로 지운 주문을 테이블별로 조회, 탭을 열 때만 조회)
+/admin/menu               → 메뉴 관리 (메뉴 추가/수정, 사진 업로드)
 ```
 
 역할별(총괄/주문서버/주방) 구분은 기존대로 URL로만 하되, `/admin/**` 진입 시 Supabase Auth 세션이 없으면 `/admin/login`으로 리다이렉트. 로그인 후에는 각 디바이스가 원래 열어두려던 URL로 이동해 그대로 사용.

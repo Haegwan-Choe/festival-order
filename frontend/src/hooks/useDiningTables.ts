@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch'
 import { supabase } from '@/lib/supabaseClient'
 import type { DiningTable, TableStatus } from '@/types/domain'
 
@@ -12,6 +13,8 @@ interface DiningTableRow {
   grid_col: number
   group_id: number | null
 }
+
+const WATCHED_TABLES = ['dining_table'] as const
 
 function mapRow(row: DiningTableRow): DiningTable {
   return {
@@ -45,20 +48,7 @@ export function useDiningTables() {
     setLoading(false)
   }, [])
 
-  useEffect(() => {
-    refetch()
-
-    const channel = supabase
-      .channel('dining_table_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'dining_table' }, () => {
-        refetch()
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [refetch])
+  useRealtimeRefetch('dining_table_changes', WATCHED_TABLES, refetch)
 
   return { tables, loading, refetch }
 }

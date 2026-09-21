@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AdminLayout } from './components/AdminLayout'
 import { RequireAdmin } from './components/RequireAdmin'
 import { AuthProvider } from './contexts/AuthContext'
+import AdminHistory from './pages/admin/AdminHistory'
 import AdminKitchen from './pages/admin/AdminKitchen'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminMenu from './pages/admin/AdminMenu'
@@ -21,6 +22,7 @@ export default function App() {
               <Route path="/admin/overview" element={<AdminOverview />} />
               <Route path="/admin/orders" element={<AdminOrders />} />
               <Route path="/admin/kitchen" element={<AdminKitchen />} />
+              <Route path="/admin/history" element={<AdminHistory />} />
               <Route path="/admin/menu" element={<AdminMenu />} />
             </Route>
           </Route>
