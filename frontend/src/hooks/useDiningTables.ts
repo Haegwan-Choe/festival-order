@@ -1,13 +1,14 @@
 import { useCallback, useState } from 'react'
 import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch'
 import { supabase } from '@/lib/supabaseClient'
-import type { DiningTable, TableStatus } from '@/types/domain'
+import type { DiningTable, TableStatus, TableType } from '@/types/domain'
 
 interface DiningTableRow {
   id: number
   zone: string
   seat_number: number
   status: TableStatus
+  table_type: TableType
   entered_at: string | null
   grid_row: number
   grid_col: number
@@ -22,6 +23,7 @@ function mapRow(row: DiningTableRow): DiningTable {
     zone: row.zone,
     seatNumber: row.seat_number,
     status: row.status,
+    tableType: row.table_type,
     enteredAt: row.entered_at,
     gridRow: row.grid_row,
     gridCol: row.grid_col,
@@ -36,7 +38,7 @@ export function useDiningTables() {
   const refetch = useCallback(async () => {
     const { data, error } = await supabase
       .from('dining_table')
-      .select('id, zone, seat_number, status, entered_at, grid_row, grid_col, group_id')
+      .select('id, zone, seat_number, status, table_type, entered_at, grid_row, grid_col, group_id')
       .order('zone')
       .order('seat_number')
 

@@ -77,9 +77,11 @@ export function SeatGrid({ tables, onCheckout, onMove, onMerge }: SeatGridProps)
   }
 
   const zones = [...new Set(tables.map((table) => table.zone))].sort()
+  const hasDura = tables.some((table) => table.tableType === 'DURA')
 
   return (
     <div className="space-y-6 overflow-x-auto pb-2">
+      {hasDura && <p className="text-xs text-muted-foreground">🔶 듀라테이블(일반보다 큼)</p>}
       {zones.map((zone) => {
         const zoneTables = tables.filter((table) => table.zone === zone)
         const maxRow = Math.max(0, ...zoneTables.map((table) => table.gridRow))
@@ -112,6 +114,7 @@ export function SeatGrid({ tables, onCheckout, onMove, onMerge }: SeatGridProps)
                 }
 
                 const occupied = table.status === 'OCCUPIED'
+                const isDura = table.tableType === 'DURA'
                 const group = table.groupId !== null ? colorForGroup(table.groupId) : null
                 const selected = selectedForMerge.some((t) => t.id === table.id)
 
@@ -123,16 +126,23 @@ export function SeatGrid({ tables, onCheckout, onMove, onMerge }: SeatGridProps)
                     onDragStart={(e) => e.dataTransfer.setData('text/plain', String(table.id))}
                     onClick={() => handleCellClick(table)}
                     className={cn(
-                      'flex aspect-square flex-col items-center justify-center gap-0.5 rounded-md border p-1 text-sm transition-colors',
+                      'relative flex flex-col items-center justify-center gap-0.5 rounded-md border p-1 text-sm transition-colors',
+                      // 듀라테이블은 일반 좌석(3rem x 3rem) 대비 면적 150% 직사각형 — 높이는 같고 너비만 1.5배(4.5rem)
+                      isDura ? 'h-[3rem] w-[4.5rem]' : 'aspect-square',
                       group
                         ? cn(group.border, group.bg, group.text, group.hover)
                         : occupied
                           ? 'border-orange-300 bg-orange-50 text-orange-900 hover:bg-orange-100'
                           : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted',
+                      isDura && !group && 'border-2 border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100',
+                      isDura && 'z-10 font-bold shadow-sm',
                       selected && 'ring-2 ring-primary ring-offset-1',
                     )}
                   >
-                    <span className="font-semibold">{formatTableLabel(table.zone, table.seatNumber)}</span>
+                    <span className="font-semibold">
+                      {isDura && '🔶 '}
+                      {formatTableLabel(table.zone, table.seatNumber)}
+                    </span>
                     <span className="text-[11px]">
                       {occupied && table.enteredAt ? formatElapsed(table.enteredAt, now) : '빈자리'}
                     </span>

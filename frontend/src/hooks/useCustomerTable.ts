@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import type { DiningTable, OrderItemStatus, OrderView, TableStatus } from '@/types/domain'
+import type { DiningTable, OrderItemStatus, OrderView, TableStatus, TableType } from '@/types/domain'
 
 interface DiningTableRow {
   id: number
   zone: string
   seat_number: number
   status: TableStatus
+  table_type: TableType
   entered_at: string | null
   grid_row: number
   grid_col: number
@@ -36,7 +37,7 @@ export function useCustomerTable(zone: string, seatNumber: number) {
   const refetch = useCallback(async () => {
     const { data: tableRow, error: tableError } = await supabase
       .from('dining_table')
-      .select('id, zone, seat_number, status, entered_at, grid_row, grid_col, group_id')
+      .select('id, zone, seat_number, status, table_type, entered_at, grid_row, grid_col, group_id')
       .eq('zone', zone)
       .eq('seat_number', seatNumber)
       .maybeSingle()
@@ -55,6 +56,7 @@ export function useCustomerTable(zone: string, seatNumber: number) {
       zone: row.zone,
       seatNumber: row.seat_number,
       status: row.status,
+      tableType: row.table_type,
       enteredAt: row.entered_at,
       gridRow: row.grid_row,
       gridCol: row.grid_col,

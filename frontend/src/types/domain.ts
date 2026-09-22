@@ -1,4 +1,5 @@
 export type TableStatus = 'EMPTY' | 'OCCUPIED'
+export type TableType = 'NORMAL' | 'DURA'
 export type OrderItemStatus = 'PENDING_PAYMENT' | 'COOKING' | 'SERVED'
 
 export interface DiningTable {
@@ -6,6 +7,7 @@ export interface DiningTable {
   zone: string
   seatNumber: number
   status: TableStatus
+  tableType: TableType
   enteredAt: string | null
   gridRow: number
   gridCol: number

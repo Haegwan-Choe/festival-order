@@ -44,9 +44,13 @@
 | 필드 | 타입 | 설명 |
 |---|---|---|
 | id | bigint | PK |
-| table_number | integer | 테이블 번호 (unique) |
+| zone | text | 구역(A/B 등). seat_number와 합쳐 `formatTableLabel`로 "A-1"처럼 표시되는 테이블의 정체성(QR코드·주문에 연결된 라벨) — 드래그로 위치를 옮겨도 바뀌지 않음 |
+| seat_number | integer | 구역 내 좌석 번호 (zone, seat_number) unique |
 | status | table_status enum | EMPTY / OCCUPIED |
+| table_type | dining_table_type enum | NORMAL / DURA — 듀라테이블(일반보다 큼)은 관리자 화면에서 더 크게 표시됨 |
 | entered_at | timestamptz | 입장 시각 (최초 접속 시 기록) |
+| grid_row / grid_col | integer | 총괄 화면 SeatGrid상의 표시 위치. (zone, grid_row, grid_col) unique, 드래그로 변경 |
+| group_id | bigint | 합석 그룹 anchor(다른 dining_table.id 참조). 합석된 테이블끼리 같은 group_id를 가짐 |
 
 ### menu_item (메뉴)
 | 필드 | 타입 | 설명 |
@@ -116,7 +120,7 @@ REST 엔드포인트를 직접 만드는 대신, 클라이언트가 Supabase JS 
 | 퇴석 처리 | RPC `checkout_table(zone, seat_number)` | 주문을 `order_log`(정산/사후 확인용 스냅샷, 메뉴명·가격은 퇴석 시점 값, 관리자만 조회 가능)에 복사한 뒤 주문 삭제 + dining_table.status→EMPTY, entered_at→null (총괄 전용) |
 | 메뉴 추가 | RPC `create_menu_item(name, price, category)` | 새 메뉴 등록 (available=true로 시작) |
 | 메뉴 수정 | RPC `update_menu_item(id, name, price, category, available)` | 가격 변경, 품절 처리(available=false) 등 |
-| 테이블 추가 | RPC `add_dining_table(table_number)` | 행사 중 좌석을 늘려야 할 때 |
+| 테이블 추가 | RPC `add_dining_table(zone, seat_number, grid_row, grid_col, table_type?)` | 행사 중 좌석을 늘려야 할 때. table_type 생략 시 기본 NORMAL |
 
 > 상태를 바꾸는 모든 동작은 RPC 함수로만 가능하며, 해당 테이블에 대한 직접 INSERT/UPDATE/DELETE는 RLS로 차단한다 (5장 참고). 메뉴/테이블 삭제 RPC는 의도적으로 만들지 않음 — 메뉴는 `available=false`로 감추고, 이미 주문 이력이 걸린 데이터를 삭제하면 FK 무결성이 깨지기 때문.
 
