@@ -77,11 +77,9 @@ export function SeatGrid({ tables, onCheckout, onMove, onMerge }: SeatGridProps)
   }
 
   const zones = [...new Set(tables.map((table) => table.zone))].sort()
-  const hasDura = tables.some((table) => table.tableType === 'DURA')
 
   return (
     <div className="space-y-6 overflow-x-auto pb-2">
-      {hasDura && <p className="text-xs text-muted-foreground">🔶 듀라테이블(일반보다 큼)</p>}
       {zones.map((zone) => {
         const zoneTables = tables.filter((table) => table.zone === zone)
         const maxRow = Math.max(0, ...zoneTables.map((table) => table.gridRow))
@@ -134,15 +132,11 @@ export function SeatGrid({ tables, onCheckout, onMove, onMerge }: SeatGridProps)
                         : occupied
                           ? 'border-orange-300 bg-orange-50 text-orange-900 hover:bg-orange-100'
                           : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted',
-                      isDura && !group && 'border-2 border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100',
-                      isDura && 'z-10 font-bold shadow-sm',
+                      isDura && 'z-10',
                       selected && 'ring-2 ring-primary ring-offset-1',
                     )}
                   >
-                    <span className="font-semibold">
-                      {isDura && '🔶 '}
-                      {formatTableLabel(table.zone, table.seatNumber)}
-                    </span>
+                    <span className="font-semibold">{formatTableLabel(table.zone, table.seatNumber)}</span>
                     <span className="text-[11px]">
                       {occupied && table.enteredAt ? formatElapsed(table.enteredAt, now) : '빈자리'}
                     </span>
