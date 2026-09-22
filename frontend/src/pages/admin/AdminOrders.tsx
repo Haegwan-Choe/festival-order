@@ -14,6 +14,7 @@ export default function AdminOrders() {
       orders={orders}
       filterStatus={['PENDING_PAYMENT', 'COOKING', 'SERVED']}
       allowedActions={['confirmPayment', 'dismissOrder']}
+      showTotal
       onConfirmPayment={(orderId) => confirmPayment(orderId).catch((e) => alert(e.message))}
       onDismissOrder={(orderId) => dismissOrder(orderId).catch((e) => alert(e.message))}
     />

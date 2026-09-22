@@ -25,12 +25,20 @@ interface OrderQueueProps {
   onConfirmPayment?: (orderId: number) => void
   onMarkServed?: (itemId: number) => void
   onDismissOrder?: (orderId: number) => void
+  /** 카드에 메뉴 합산 금액을 표시할지 여부 (서빙/총괄 화면용) */
+  showTotal?: boolean
+  /** 노트북/태블릿처럼 넓은 화면에서 크게 보여줄 때 (주방 화면용) */
+  size?: 'default' | 'lg'
 }
 
 const HIDE_AFTER_SERVED_MS = 3 * 60_000
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatWon(amount: number) {
+  return `${amount.toLocaleString()}원`
 }
 
 export function OrderQueue({
@@ -40,7 +48,10 @@ export function OrderQueue({
   onConfirmPayment,
   onMarkServed,
   onDismissOrder,
+  showTotal = false,
+  size = 'default',
 }: OrderQueueProps) {
+  const large = size === 'lg'
   // 브라우저 로컬 타이머 대신 서버에 기록된 served_at을 기준으로 계산 —
   // 그래야 새로고침하거나 다른 화면으로 갔다 와도 "완료된 지 얼마나 됐는지"가 유지된다.
   const [now, setNow] = useState(() => Date.now())
@@ -82,16 +93,22 @@ export function OrderQueue({
   }
 
   return (
-    <div className="space-y-3">
+    <div className={cn(large ? 'grid gap-4 sm:grid-cols-2 2xl:grid-cols-3' : 'space-y-3')}>
       {visibleOrders.map((order) => {
         const hasPending = order.items.some((item) => item.status === 'PENDING_PAYMENT')
+        const orderTotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
         return (
           <Card key={order.orderId}>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">{order.tableLabel} 테이블</CardTitle>
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground">{formatTime(order.createdAt)}</span>
+              <CardTitle className={cn(large && 'text-2xl')}>{order.tableLabel} 테이블</CardTitle>
+              <div className="flex items-center gap-2">
+                {showTotal && (
+                  <span className="text-sm font-semibold">{formatWon(orderTotal)}</span>
+                )}
+                <span className={cn('text-xs text-muted-foreground', large && 'text-sm')}>
+                  {formatTime(order.createdAt)}
+                </span>
                 {allowedActions.includes('dismissOrder') && order.fullyServed && (
                   <Button
                     size="icon"
@@ -111,6 +128,7 @@ export function OrderQueue({
                     key={item.itemId}
                     className={cn(
                       'flex items-center justify-between rounded-md border px-3 py-2 text-sm',
+                      large && 'px-4 py-3 text-xl',
                       STATUS_BLOCK_STYLE[item.status],
                     )}
                   >
@@ -118,7 +136,12 @@ export function OrderQueue({
                       {STATUS_ICON[item.status]} {item.menuName} x{item.quantity}
                     </span>
                     {allowedActions.includes('markServed') && item.status === 'COOKING' && (
-                      <Button size="lg" variant="outline" onClick={() => onMarkServed?.(item.itemId)}>
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        className={cn(large && 'h-12 px-5 text-lg')}
+                        onClick={() => onMarkServed?.(item.itemId)}
+                      >
                         조리완료
                       </Button>
                     )}

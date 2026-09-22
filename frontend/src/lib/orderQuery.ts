@@ -1,7 +1,7 @@
 import { formatTableLabel, type OrderItemStatus, type OrderView } from '@/types/domain'
 
 export const ORDER_SELECT =
-  'id, created_at, dismissed_at, dining_table(zone, seat_number), order_item(id, quantity, status, served_at, menu_item(name))'
+  'id, created_at, dismissed_at, dining_table(zone, seat_number), order_item(id, quantity, status, served_at, menu_item(name, price))'
 
 interface OrderRow {
   id: number
@@ -13,7 +13,7 @@ interface OrderRow {
     quantity: number
     status: OrderItemStatus
     served_at: string | null
-    menu_item: { name: string } | null
+    menu_item: { name: string; price: number } | null
   }>
 }
 
@@ -28,6 +28,7 @@ function mapOrderRow(row: OrderRow): OrderView | null {
     items: row.order_item.map((item) => ({
       itemId: item.id,
       menuName: item.menu_item?.name ?? '(삭제된 메뉴)',
+      price: item.menu_item?.price ?? 0,
       quantity: item.quantity,
       status: item.status,
       servedAt: item.served_at,

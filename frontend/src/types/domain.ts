@@ -24,6 +24,7 @@ export interface MenuItem {
 export interface OrderItemView {
   itemId: number
   menuName: string
+  price: number
   quantity: number
   status: OrderItemStatus
   servedAt: string | null

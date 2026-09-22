@@ -14,6 +14,7 @@ export default function AdminKitchen() {
       orders={orders}
       filterStatus={['COOKING']}
       allowedActions={['markServed']}
+      size="lg"
       onMarkServed={(itemId) => markServed(itemId).catch((e) => alert(e.message))}
     />
   )
