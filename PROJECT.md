@@ -113,7 +113,7 @@ REST 엔드포인트를 직접 만드는 대신, 클라이언트가 Supabase JS 
 | 주문 큐 조회 | `orders`+`order_item`+`menu_item` SELECT | 총괄, 주문서버, 주방 |
 | 입금 확인 | RPC `confirm_payment(order_id)` | `admins` 등록 여부 체크 후 order.payment_confirmed=true + 하위 order_item 전체 PENDING_PAYMENT→COOKING |
 | 조리 완료 | RPC `serve_item(item_id)` | COOKING→SERVED |
-| 퇴석 처리 | RPC `checkout_table(table_number)` | 주문 정리 + dining_table.status→EMPTY, entered_at→null (총괄 전용, 함수 내부에서 추가 권한 체크) |
+| 퇴석 처리 | RPC `checkout_table(zone, seat_number)` | 주문을 `order_log`(정산/사후 확인용 스냅샷, 메뉴명·가격은 퇴석 시점 값, 관리자만 조회 가능)에 복사한 뒤 주문 삭제 + dining_table.status→EMPTY, entered_at→null (총괄 전용) |
 | 메뉴 추가 | RPC `create_menu_item(name, price, category)` | 새 메뉴 등록 (available=true로 시작) |
 | 메뉴 수정 | RPC `update_menu_item(id, name, price, category, available)` | 가격 변경, 품절 처리(available=false) 등 |
 | 테이블 추가 | RPC `add_dining_table(table_number)` | 행사 중 좌석을 늘려야 할 때 |
@@ -153,7 +153,7 @@ REST 엔드포인트를 직접 만드는 대신, 클라이언트가 Supabase JS 
 /admin/overview          → 총괄 (노트북, 반응형, 로그인 필요)
 /admin/orders            → 주문받는 서버 (폰, 로그인 필요)
 /admin/kitchen            → 주방 (폰, 로그인 필요)
-/admin/history            → 주문 내역 (X로 지운 주문을 테이블별로 조회, 탭을 열 때만 조회)
+/admin/history            → 주문 내역 (탭 2개: X로 지운 주문(퇴석 전) / 퇴석 완료 기록(order_log, 테이블별 이용 기록 + 입금확인 매출 합계). 탭을 열 때만 조회)
 /admin/menu               → 메뉴 관리 (메뉴 추가/수정, 사진 업로드)
 ```
 

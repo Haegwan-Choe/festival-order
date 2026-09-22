@@ -1,5 +1,7 @@
+import { CheckoutLog } from '@/components/admin/CheckoutLog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useDismissedOrders } from '@/hooks/useDismissedOrders'
 import type { OrderView } from '@/types/domain'
 
@@ -7,7 +9,7 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
 }
 
-export default function AdminHistory() {
+function DismissedOrders() {
   const { orders, loading, refetch } = useDismissedOrders()
 
   const byTable = new Map<string, OrderView[]>()
@@ -20,7 +22,7 @@ export default function AdminHistory() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-muted-foreground">
-          목록에서 지운 주문 (퇴석 처리 전까지 테이블별로 보관)
+          목록에서 지운 주문 (퇴석하면 아래 "퇴석 완료 기록"으로 옮겨져요)
         </h2>
         <Button variant="outline" disabled={loading} onClick={refetch}>
           {loading ? '불러오는 중...' : '새로고침'}
@@ -55,5 +57,23 @@ export default function AdminHistory() {
         })}
       </div>
     </div>
+  )
+}
+
+export default function AdminHistory() {
+  // TabsContent는 활성 탭만 마운트되므로, 각 탭의 조회는 그 탭을 열 때만 일어난다.
+  return (
+    <Tabs defaultValue="dismissed">
+      <TabsList className="w-full max-w-md">
+        <TabsTrigger value="dismissed">지운 주문</TabsTrigger>
+        <TabsTrigger value="checkout">퇴석 완료 기록</TabsTrigger>
+      </TabsList>
+      <TabsContent value="dismissed">
+        <DismissedOrders />
+      </TabsContent>
+      <TabsContent value="checkout">
+        <CheckoutLog />
+      </TabsContent>
+    </Tabs>
   )
 }
