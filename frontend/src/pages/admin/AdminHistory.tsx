@@ -22,7 +22,7 @@ function DismissedOrders() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-muted-foreground">
-          목록에서 지운 주문 (퇴석하면 아래 "퇴석 완료 기록"으로 옮겨져요)
+          목록에서 지운 주문
         </h2>
         <Button variant="outline" disabled={loading} onClick={refetch}>
           {loading ? '불러오는 중...' : '새로고침'}

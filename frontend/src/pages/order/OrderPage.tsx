@@ -36,6 +36,17 @@ function OrderPageInner({ zone, seatNumber }: { zone: string; seatNumber: number
   const [submitting, setSubmitting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
+  // 밈(음료)은 개별 메뉴가 아니라 장바구니당 하나 고르는 라디오 옵션
+  const [selectedDrinkId, setSelectedDrinkId] = useState<number | null>(null)
+  const drinkOptions = menu.filter((item) => item.category === '밈' && item.available)
+
+  // 자동으로 골라주지 않음 — 선택지가 사라졌을 때(품절 등)만 무효화
+  useEffect(() => {
+    if (selectedDrinkId !== null && !drinkOptions.some((d) => d.id === selectedDrinkId)) {
+      setSelectedDrinkId(null)
+    }
+  }, [drinkOptions, selectedDrinkId])
+
   useEffect(() => {
     if (view !== null || tableLoading || !table) return
     if (table.status === 'EMPTY') {
@@ -95,11 +106,15 @@ function OrderPageInner({ zone, seatNumber }: { zone: string; seatNumber: number
   async function handleSubmit() {
     const items = Object.entries(cart).map(([id, quantity]) => ({ menuItemId: Number(id), quantity }))
     if (items.length === 0) return
+    if (drinkOptions.length > 0 && selectedDrinkId === null) return
+
+    const finalItems = selectedDrinkId !== null ? [...items, { menuItemId: selectedDrinkId, quantity: 1 }] : items
 
     setSubmitting(true)
     try {
-      await submitOrder(zone, seatNumber, items)
+      await submitOrder(zone, seatNumber, finalItems)
       setCart({})
+      setSelectedDrinkId(null)
       await refetch()
       setView('status')
     } catch (e) {
@@ -130,9 +145,12 @@ function OrderPageInner({ zone, seatNumber }: { zone: string; seatNumber: number
       <CartView
         menu={menu}
         cart={cart}
+        drinkOptions={drinkOptions}
+        selectedDrinkId={selectedDrinkId}
         submitting={submitting}
         onIncrement={handleAdd}
         onDecrement={handleRemove}
+        onSelectDrink={setSelectedDrinkId}
         onBack={() => setView('menu')}
         onSubmit={handleSubmit}
       />

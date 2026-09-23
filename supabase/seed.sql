@@ -27,15 +27,14 @@ insert into dining_table (zone, seat_number, status, grid_row, grid_col, table_t
   ('B', 19, 'EMPTY', 0, 9, 'DURA');
 
 -- 샘플 메뉴 (카테고리: 안주 / 사이드 / 밈)
+-- 밈은 개별로 담는 메뉴가 아니라 장바구니에서 한 번만 고르는 라디오 옵션(CartView) — 지금은 '단체 밈' 하나뿐
 insert into menu_item (name, price, category, available) values
   ('떡볶이', 15000, '안주', true),
   ('순대', 13000, '안주', true),
   ('튀김모듬', 15000, '안주', true),
   ('치킨', 18000, '안주', true),
-  ('사이다', 2000, '밈', true),
-  ('콜라', 2000, '밈', true),
-  ('생수', 1000, '밈', true),
-  ('감자튀김', 8000, '사이드', true);
+  ('감자튀김', 8000, '사이드', true),
+  ('단체 밈', 9900, '밈', true);
 
 -- admins 시드는 넣지 않음: auth.users에 실제 계정이 먼저 생성돼야
 -- admins.id(FK)를 채울 수 있음. Supabase Auth로 계정을 만든 뒤

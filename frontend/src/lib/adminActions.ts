@@ -56,6 +56,11 @@ export async function createMenuItem(params: {
   if (error) throw error
 }
 
+export async function deleteMenuItem(id: number) {
+  const { error } = await supabase.rpc('delete_menu_item', { p_id: id })
+  if (error) throw error
+}
+
 export async function updateMenuItem(params: {
   id: number
   name: string
