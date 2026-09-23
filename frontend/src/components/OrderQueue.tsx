@@ -22,9 +22,9 @@ interface OrderQueueProps {
   orders: OrderView[]
   filterStatus: OrderItemStatus[]
   allowedActions: OrderQueueAction[]
-  onConfirmPayment?: (orderId: number) => void
-  onMarkServed?: (itemId: number) => void
-  onDismissOrder?: (orderId: number) => void
+  onConfirmPayment?: (orderId: number) => void | Promise<void>
+  onMarkServed?: (itemId: number) => void | Promise<void>
+  onDismissOrder?: (orderId: number) => void | Promise<void>
   /** 카드에 메뉴 합산 금액을 표시할지 여부 (서빙/총괄 화면용) */
   showTotal?: boolean
   /** 노트북/태블릿처럼 넓은 화면에서 크게 보여줄 때 (주방 화면용) */
@@ -56,10 +56,25 @@ export function OrderQueue({
   // 그래야 새로고침하거나 다른 화면으로 갔다 와도 "완료된 지 얼마나 됐는지"가 유지된다.
   const [now, setNow] = useState(() => Date.now())
   const [pendingDismiss, setPendingDismiss] = useState<{ orderId: number; tableLabel: string } | null>(null)
+  // 연타 방지: 요청이 진행 중인 항목/주문 id를 담아뒀다가 버튼을 잠시 비활성화한다.
+  const [pendingItemIds, setPendingItemIds] = useState<Set<number>>(new Set())
+  const [pendingOrderIds, setPendingOrderIds] = useState<Set<number>>(new Set())
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 5_000)
     return () => clearInterval(id)
   }, [])
+
+  function runOnce(id: number, pendingIds: Set<number>, setPendingIds: typeof setPendingItemIds, action?: (id: number) => void | Promise<void>) {
+    if (!action || pendingIds.has(id)) return
+    setPendingIds((prev) => new Set(prev).add(id))
+    Promise.resolve(action(id)).finally(() => {
+      setPendingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    })
+  }
 
   function isFullyServed(order: OrderView) {
     return order.items.length > 0 && order.items.every((item) => item.status === 'SERVED')
@@ -140,17 +155,23 @@ export function OrderQueue({
                         size="lg"
                         variant="outline"
                         className={cn(large && 'h-12 px-5 text-lg')}
-                        onClick={() => onMarkServed?.(item.itemId)}
+                        disabled={pendingItemIds.has(item.itemId)}
+                        onClick={() => runOnce(item.itemId, pendingItemIds, setPendingItemIds, onMarkServed)}
                       >
-                        조리완료
+                        {pendingItemIds.has(item.itemId) ? '처리 중...' : '조리완료'}
                       </Button>
                     )}
                   </li>
                 ))}
               </ul>
               {allowedActions.includes('confirmPayment') && hasPending && (
-                <Button size="lg" className="w-full" onClick={() => onConfirmPayment?.(order.orderId)}>
-                  입금 확인
+                <Button
+                  size="lg"
+                  className="w-full"
+                  disabled={pendingOrderIds.has(order.orderId)}
+                  onClick={() => runOnce(order.orderId, pendingOrderIds, setPendingOrderIds, onConfirmPayment)}
+                >
+                  {pendingOrderIds.has(order.orderId) ? '처리 중...' : '입금 확인'}
                 </Button>
               )}
             </CardContent>
