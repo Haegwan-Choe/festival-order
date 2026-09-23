@@ -58,8 +58,10 @@
 | id | bigint | PK |
 | name | text | 메뉴명 |
 | price | integer | 가격 |
-| category | text | 안주 / 음료 / 사이드 등 |
+| category | text | 안주 / 사이드 / 밈 |
 | available | boolean | 품절 여부 (기본 true) |
+
+> **밈(음료) 카테고리는 손님 메뉴 화면에서 개별로 담는 메뉴가 아니다.** 장바구니 화면에서 테이블당 한 번만 고르는 선택형 라디오 추가옵션(선택 안 해도 주문 가능)으로 노출되고, 고른 항목은 그냥 같은 주문의 order_item 한 줄로 얹혀서 들어간다 — 스키마·RPC 변경 없이 프론트(`CartView`)에서만 처리. 지금은 밈 카테고리에 "단체 밈"(9,900원) 하나만 활성화되어 있고, 예전 개별 음료(사이다/콜라/생수 등)는 `available=false`로 감춰뒀다.
 
 ### orders (주문)
 | 필드 | 타입 | 설명 |
@@ -120,9 +122,10 @@ REST 엔드포인트를 직접 만드는 대신, 클라이언트가 Supabase JS 
 | 퇴석 처리 | RPC `checkout_table(zone, seat_number)` | 주문을 `order_log`(정산/사후 확인용 스냅샷, 메뉴명·가격은 퇴석 시점 값, 관리자만 조회 가능)에 복사한 뒤 주문 삭제 + dining_table.status→EMPTY, entered_at→null (총괄 전용) |
 | 메뉴 추가 | RPC `create_menu_item(name, price, category)` | 새 메뉴 등록 (available=true로 시작) |
 | 메뉴 수정 | RPC `update_menu_item(id, name, price, category, available)` | 가격 변경, 품절 처리(available=false) 등 |
+| 메뉴 삭제 | RPC `delete_menu_item(id)` | 실제 하드 삭제(관리자 화면 수정 팝업의 빨간 "삭제" 버튼). `order_item.menu_item_id`가 그 메뉴를 참조 중이면(=퇴석 전 진행 중인 주문에 걸려있으면) FK 제약으로 자동 실패 — 퇴석 완료된 메뉴는 order_log에 스냅샷만 남고 참조가 없어지므로 삭제 가능해짐. 별도 체크 코드 없이 DB가 보장 |
 | 테이블 추가 | RPC `add_dining_table(zone, seat_number, grid_row, grid_col, table_type?)` | 행사 중 좌석을 늘려야 할 때. table_type 생략 시 기본 NORMAL |
 
-> 상태를 바꾸는 모든 동작은 RPC 함수로만 가능하며, 해당 테이블에 대한 직접 INSERT/UPDATE/DELETE는 RLS로 차단한다 (5장 참고). 메뉴/테이블 삭제 RPC는 의도적으로 만들지 않음 — 메뉴는 `available=false`로 감추고, 이미 주문 이력이 걸린 데이터를 삭제하면 FK 무결성이 깨지기 때문.
+> 상태를 바꾸는 모든 동작은 RPC 함수로만 가능하며, 해당 테이블에 대한 직접 INSERT/UPDATE/DELETE는 RLS로 차단한다 (5장 참고). 테이블(dining_table) 삭제 RPC는 여전히 의도적으로 안 만듦 — 좌석은 없앨 일이 거의 없고 만들면 grid 배치/합석 로직이 복잡해짐. 메뉴는 하드 삭제(위 `delete_menu_item`)와 소프트 삭제(`available=false`, 품절 처리) 둘 다 가능 — 진행 중인 주문에 걸린 메뉴는 하드 삭제가 막히니 그럴 땐 품절 처리로 대체.
 
 ---
 
@@ -165,8 +168,8 @@ REST 엔드포인트를 직접 만드는 대신, 클라이언트가 Supabase JS 
 
 ### 7-1. 고객 화면 (`/order/{tableNumber}`)
 1. **입장 화면**: 테이블 번호 확인 → "주문하러 가기" (재접속 시 스킵)
-2. **메뉴 화면**: 카테고리 탭 + 메뉴 리스트 + 담기, 하단 고정 "장바구니 보기" CTA
-3. **장바구니/주문확인**: 수량 조절 → "주문하기"
+2. **메뉴 화면**: 탭 없이 한 화면에 쭉 스크롤(카테고리별 소제목만 구분, 안주/사이드), 담기, 하단 고정 "장바구니 보기" CTA. 밈(음료) 카테고리는 여기 안 보임(3번 참고)
+3. **장바구니/주문확인**: 수량 조절 → 밈 추가옵션(선택, 라디오 — "선택 안 함" 포함, 고르지 않아도 주문 가능) → "주문하기"
 4. **주문 현황**: 주문(제출 단위)별로 메뉴 상태(대기중/조리중/완료)와 합산 금액 표시. 입금 미확인 항목이 있으면 상단에 입금 계좌 안내 배너(계좌번호 복사 버튼 포함)와 입금할 금액 노출. "메뉴 추가 주문" 가능
 
 ### 7-2. 운영자 공통 컴포넌트
@@ -195,6 +198,11 @@ REST 엔드포인트를 직접 만드는 대신, 클라이언트가 Supabase JS 
 ### 7-4. 큐 카드 표시 규칙
 - 상태별 아이콘: 🟠 입금대기 → 🔥 조리중 → ✅ 완료(짧게 표시 후 자동 제거)
 - 🟠 입금대기 항목은 항상 최상단 고정, 그 외는 먼저 들어온 주문이 위로 (오래된 순 — 스크롤 안 내리고도 가장 오래 기다린 주문부터 처리하기 위함)
+- **연타 방지**: 조리완료/입금확인 버튼은 누르는 즉시 그 항목 id를 로컬 "처리 중" 집합에 넣고 비활성화, 응답 오면 해제(`OrderQueue.tsx`). RPC 자체도 `WHERE status='이전상태'` 조건이라 중복 호출이 와도 데이터는 안 깨짐 — 이건 순수 프론트 최적화
+
+### 7-5. 듀라테이블
+- `dining_table.table_type='DURA'`인 좌석은 SeatGrid에서 일반 좌석(3rem×3rem) 대비 **면적 150%** 직사각형(높이 동일 3rem, 너비만 1.5배 4.5rem)으로 렌더링. 색상/아이콘 등 별도 강조는 없음(요청에 따라 제거) — 크기만 다름
+- 인접 좌석과 겹치지 않도록 그리드 배치 시 한 칸씩 띄워서(버퍼 컬럼) 배치해야 함
 
 ---
 
@@ -211,7 +219,40 @@ REST 엔드포인트를 직접 만드는 대신, 클라이언트가 Supabase JS 
 
 - **프론트: Vercel** — React 프로젝트를 GitHub 연동해 git push 시 자동 배포, 무료 플랜으로 충분
 - **백엔드: Supabase** — Postgres + Auth + Realtime + Edge Function을 프로젝트 하나로 커버, 별도 서버 관리 없음
-- Supabase 무료 플랜은 **7일간 API 요청이 없으면 프로젝트가 일시정지**됨 → 행사 며칠 전부터 미리 요청을 보내 깨어있는 상태를 유지하고, 행사 당일 아침에도 한 번 더 확인
+- Supabase 무료 플랜은 **7일간 API 요청이 없으면 프로젝트가 일시정지**됨 → claude.ai 예약 루틴(`festival-order Supabase keep-alive ping`, 3일마다 `menu_item`에 가벼운 GET 요청)으로 자동 방지 중. https://claude.ai/code/routines 에서 확인/관리 가능(로컬 파일로는 안 남음). 그래도 행사 당일 아침엔 한 번 더 수동 확인 권장
 - 환경변수(`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`)는 Vercel 프로젝트 설정에 등록, 코드에 하드코딩 금지 (레거시 anon key 대신 새 publishable key 사용)
 - SPA 라우팅 새로고침 대응은 Vercel이 기본 지원 (필요 시 `vercel.json`에서 rewrites 설정)
 - 행사 당일에는 배포 변경을 최소화하고, 사전 리허설로 안정성 확인
+
+---
+
+## 10. 새 컴퓨터에서 이어서 작업하기
+
+### 10-1. 꼭 있어야 하는 것
+- **저장소**: `git clone https://github.com/Haegwan-Choe/festival-order.git` (push 권한 있는 GitHub 계정으로)
+- **Node.js** — 지금 쓰던 버전은 v24. `frontend/` 안에서 `npm install` 후 `npm run dev`(개발 서버), `npm run build`(빌드 검증), `npm run lint`(oxlint)
+- **`frontend/.env.local`** (git에 커밋 안 됨, `frontend/.env.example` 참고해서 새로 만들어야 함):
+  ```
+  VITE_SUPABASE_URL=https://gzzhkvgolfeqmibpnxda.supabase.co
+  VITE_SUPABASE_PUBLISHABLE_KEY=<Supabase 대시보드 Settings → API Keys에서 publishable key 복사>
+  ```
+- **Supabase CLI** — 전역 설치 필요 없이 `npx supabase <명령어>`로 바로 사용 가능 (이 저장소 devDependency는 아니라서 처음 실행 시 npx가 자동으로 받아옴)
+  - `supabase/.temp/`(project-ref 등 링크 상태)는 `.gitignore`에 있어서 **커밋 안 됨** — 새 컴퓨터에서는 `npx supabase link --project-ref gzzhkvgolfeqmibpnxda`를 한 번 실행해야 `db push`/`migration list` 등이 이 프로젝트를 향하게 됨
+  - 운영 DB에 마이그레이션 반영(`npx supabase db push`)하려면 Supabase 대시보드(Account → Access Tokens)에서 개인 액세스 토큰을 발급해서 `SUPABASE_ACCESS_TOKEN` 환경변수로 넘겨야 함(link할 때도 필요) — 토큰은 git에 올리지 말 것
+
+### 10-2. 있으면 좋은 것 (로컬 검증용)
+- **Docker Desktop** — `npx supabase start`로 로컬 Supabase 스택(Postgres+Auth+Realtime 등)을 띄워서 마이그레이션을 운영 DB에 올리기 전에 미리 검증할 수 있음. 이번 작업들(테이블 재배치, 메뉴 마이그레이션 등)도 전부 이 방식으로 먼저 로컬에서 검증 후 `db push`했음
+  - 자주 쓰는 흐름: `npx supabase start` → (마이그레이션 작성) → `npx supabase db reset --local`(전체 재적용+seed) → 확인 → 문제없으면 `SUPABASE_ACCESS_TOKEN` 세팅 후 `npx supabase db push`
+- VS Code 확장은 필수로 강제해둔 게 없음(레포에 `.vscode/extensions.json` 없음) — Tailwind CSS IntelliSense, ESLint 정도면 충분
+
+### 10-3. 접근 권한이 필요한 외부 서비스
+| 서비스 | 용도 | 비고 |
+|---|---|---|
+| GitHub (`Haegwan-Choe/festival-order`) | 코드 push, Vercel 자동배포 트리거 | main에 push하면 Vercel이 자동 빌드/배포 |
+| Vercel 대시보드 | 프론트 배포 상태 확인, 환경변수 관리 | env var 자체는 Vercel 프로젝트 설정에 있고 저장소엔 없음 |
+| Supabase 대시보드(project `festival-order`, ref `gzzhkvgolfeqmibpnxda`) | DB 데이터 직접 확인, 관리자 계정(Auth) 발급, Access Token 발급 | 관리자 로그인 계정은 여기서 Auth 유저 만들고 `admins` 테이블에 `(uuid, display_name)`으로 등록해야 실제 관리자로 인정됨 (6장 참고) |
+| claude.ai 예약 루틴 | Supabase 7일 비활성 정지 방지 크론 | 코드로 안 남고 claude.ai 계정에 종속 — 계정 바뀌면 `/schedule`로 다시 만들어야 함 |
+
+### 10-4. 하드코딩된 값 중 바뀔 수 있는 것
+- 입금 계좌 정보: [`frontend/src/lib/paymentInfo.ts`](frontend/src/lib/paymentInfo.ts) — 계좌 바뀌면 이 파일만 고치면 됨
+- 그 외 상태/가격 등은 전부 DB(`menu_item`, `dining_table`)에 있어서 관리자 화면에서 직접 수정 가능, 코드 안 건드려도 됨
