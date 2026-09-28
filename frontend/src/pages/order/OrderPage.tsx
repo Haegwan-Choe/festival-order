@@ -7,6 +7,7 @@ import { StatusView } from '@/components/order/StatusView'
 import { useCustomerTable } from '@/hooks/useCustomerTable'
 import { useMenu } from '@/hooks/useMenu'
 import { enterTable, submitOrder } from '@/lib/customerActions'
+import { friendlyErrorMessage } from '@/lib/friendlyError'
 import { formatTableLabel, parseTableLabel } from '@/types/domain'
 
 export default function OrderPage() {
@@ -83,7 +84,7 @@ function OrderPageInner({ zone, seatNumber }: { zone: string; seatNumber: number
       await refetch()
       setView('menu')
     } catch (e) {
-      alert((e as Error).message)
+      alert(friendlyErrorMessage(e))
     } finally {
       setEntering(false)
     }
@@ -118,7 +119,7 @@ function OrderPageInner({ zone, seatNumber }: { zone: string; seatNumber: number
       await refetch()
       setView('status')
     } catch (e) {
-      alert((e as Error).message)
+      alert(friendlyErrorMessage(e))
     } finally {
       setSubmitting(false)
     }
