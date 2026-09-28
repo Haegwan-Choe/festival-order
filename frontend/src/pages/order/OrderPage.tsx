@@ -107,7 +107,6 @@ function OrderPageInner({ zone, seatNumber }: { zone: string; seatNumber: number
   async function handleSubmit() {
     const items = Object.entries(cart).map(([id, quantity]) => ({ menuItemId: Number(id), quantity }))
     if (items.length === 0) return
-    if (drinkOptions.length > 0 && selectedDrinkId === null) return
 
     const finalItems = selectedDrinkId !== null ? [...items, { menuItemId: selectedDrinkId, quantity: 1 }] : items
 
