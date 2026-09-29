@@ -28,7 +28,7 @@ export default function OrderPage() {
 type View = 'entry' | 'menu' | 'cart' | 'status'
 
 function OrderPageInner({ zone, seatNumber }: { zone: string; seatNumber: number }) {
-  const { menu, loading: menuLoading } = useMenu()
+  const { menu, loading: menuLoading, refetch: refetchMenu } = useMenu()
   const { table, orders, loading: tableLoading, refetch } = useCustomerTable(zone, seatNumber)
 
   const [view, setView] = useState<View | null>(null)
@@ -47,6 +47,24 @@ function OrderPageInner({ zone, seatNumber }: { zone: string; seatNumber: number
       setSelectedDrinkId(null)
     }
   }, [drinkOptions, selectedDrinkId])
+
+  // 장바구니에 담아둔 메뉴가 그 사이 품절되거나 삭제됐으면 자동으로 빼준다 (메뉴가 새로
+  // 불러와질 때마다 검사 — 주문 실패 후 refetchMenu()가 호출되면 여기서 정리됨).
+  useEffect(() => {
+    setCart((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const idStr of Object.keys(next)) {
+        const id = Number(idStr)
+        const menuItem = menu.find((m) => m.id === id)
+        if (!menuItem || !menuItem.available) {
+          delete next[id]
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [menu])
 
   useEffect(() => {
     if (view !== null || tableLoading || !table) return
@@ -117,7 +135,11 @@ function OrderPageInner({ zone, seatNumber }: { zone: string; seatNumber: number
     try {
       await submitOrder(zone, seatNumber, finalItems)
     } catch (e) {
-      alert(friendlyErrorMessage(e))
+      console.error(e)
+      alert('주문이 안 됐어요. 그 사이 품절된 메뉴가 있으면 장바구니에서 자동으로 빠집니다 — 확인하고 다시 시도해주세요.')
+      // 품절/삭제된 메뉴 때문에 실패했을 수 있으니 최신 메뉴를 다시 받아온다 —
+      // 위의 정리용 useEffect가 새 메뉴 기준으로 장바구니를 자동으로 걸러준다.
+      refetchMenu().catch((err) => console.error('메뉴 새로고침 실패', err))
       setSubmitting(false)
       return
     }
