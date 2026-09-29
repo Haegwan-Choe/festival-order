@@ -81,13 +81,16 @@ function OrderPageInner({ zone, seatNumber }: { zone: string; seatNumber: number
     setEntering(true)
     try {
       await enterTable(zone, seatNumber)
-      await refetch()
-      setView('menu')
     } catch (e) {
       alert(friendlyErrorMessage(e))
-    } finally {
       setEntering(false)
+      return
     }
+    // 입장 자체는 성공했으니, 새로고침이 실패해도 화면은 넘어가야 한다 (안 그러면
+    // 손님이 "안 됐나?" 하고 다시 누르게 됨 — enter_table은 멱등이라 위험하진 않지만 헷갈림).
+    setView('menu')
+    setEntering(false)
+    refetch().catch((e) => console.error('입장 후 새로고침 실패', e))
   }
 
   function handleAdd(menuItemId: number) {
@@ -113,15 +116,19 @@ function OrderPageInner({ zone, seatNumber }: { zone: string; seatNumber: number
     setSubmitting(true)
     try {
       await submitOrder(zone, seatNumber, finalItems)
-      setCart({})
-      setSelectedDrinkId(null)
-      await refetch()
-      setView('status')
     } catch (e) {
       alert(friendlyErrorMessage(e))
-    } finally {
       setSubmitting(false)
+      return
     }
+    // 주문 생성 자체는 성공했으니, 새로고침이 실패해도 반드시 주문 현황 화면으로 넘어가야 한다.
+    // 안 그러면 장바구니는 비워졌는데 에러만 뜨는 꼴이라 손님이 "주문 안 됐나?" 하고
+    // 중복 주문을 시도할 수 있음.
+    setCart({})
+    setSelectedDrinkId(null)
+    setView('status')
+    setSubmitting(false)
+    refetch().catch((e) => console.error('주문 후 새로고침 실패', e))
   }
 
   async function handleRefresh() {
