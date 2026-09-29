@@ -44,7 +44,7 @@ export function StatusView({ tableLabel, orders, refreshing, onAddMore, onRefres
     <div className="min-h-dvh space-y-4 p-4 pb-28">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-muted-foreground">밈천지</p>
+          <p className="text-sm text-muted-foreground">불~교~ (부처님톤으로)</p>
           <h1 className="text-lg font-semibold">{tableLabel} 테이블 주문 현황</h1>
         </div>
         <Button variant="ghost" size="sm" disabled={refreshing} onClick={onRefresh}>

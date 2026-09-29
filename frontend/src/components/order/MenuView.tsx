@@ -31,7 +31,7 @@ export function MenuView({ menu, cart, onAdd, onRemove, onViewCart }: MenuViewPr
   return (
     <div className="min-h-dvh pb-28">
       <div className="p-4">
-        <h1 className="text-2xl font-black tracking-tight">밈천지</h1>
+        <h1 className="text-2xl font-black tracking-tight">불~교~ (부처님톤으로)</h1>
         <p className="text-sm text-muted-foreground">메뉴</p>
       </div>
 
