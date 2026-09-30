@@ -2,12 +2,9 @@ import { ImageIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { CATEGORY_ORDER, HIDDEN_CATEGORY } from '@/lib/menuCategories'
 import { cn } from '@/lib/utils'
 import type { MenuItem } from '@/types/domain'
-
-const CATEGORY_ORDER = ['자릿세', '안주', '사이드']
-// 밈(음료)은 개별로 담는 메뉴가 아니라 장바구니에서 딱 한 번 고르는 옵션이라 여기서는 숨김
-const HIDDEN_CATEGORY = '밈'
 
 interface MenuViewProps {
   menu: MenuItem[]
