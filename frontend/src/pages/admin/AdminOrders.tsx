@@ -1,6 +1,6 @@
 import { OrderQueue } from '@/components/OrderQueue'
 import { useOrderQueue } from '@/hooks/useOrderQueue'
-import { confirmPayment, dismissOrder } from '@/lib/adminActions'
+import { cancelOrder, cancelOrderItem, confirmPayment, dismissOrder } from '@/lib/adminActions'
 
 export default function AdminOrders() {
   const { orders, loading } = useOrderQueue()
@@ -13,10 +13,12 @@ export default function AdminOrders() {
     <OrderQueue
       orders={orders}
       filterStatus={['PENDING_PAYMENT', 'COOKING', 'SERVED']}
-      allowedActions={['confirmPayment', 'dismissOrder']}
+      allowedActions={['confirmPayment', 'dismissOrder', 'cancelPending']}
       showTotal
       onConfirmPayment={(orderId) => confirmPayment(orderId).catch((e) => alert(e.message))}
       onDismissOrder={(orderId) => dismissOrder(orderId).catch((e) => alert(e.message))}
+      onCancelOrder={(orderId) => cancelOrder(orderId).catch((e) => alert(e.message))}
+      onCancelOrderItem={(itemId) => cancelOrderItem(itemId).catch((e) => alert(e.message))}
     />
   )
 }

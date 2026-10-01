@@ -3,6 +3,8 @@ import { SeatGrid } from '@/components/SeatGrid'
 import { useDiningTables } from '@/hooks/useDiningTables'
 import { useOrderQueue } from '@/hooks/useOrderQueue'
 import {
+  cancelOrder,
+  cancelOrderItem,
   checkoutTable,
   confirmPayment,
   dismissOrder,
@@ -39,11 +41,13 @@ export default function AdminOverview() {
           <OrderQueue
             orders={orders}
             filterStatus={['PENDING_PAYMENT', 'COOKING', 'SERVED']}
-            allowedActions={['confirmPayment', 'markServed', 'dismissOrder']}
+            allowedActions={['confirmPayment', 'markServed', 'dismissOrder', 'cancelPending']}
             showTotal
             onConfirmPayment={(orderId) => confirmPayment(orderId).catch((e) => alert(e.message))}
             onMarkServed={(itemId) => markServed(itemId).catch((e) => alert(e.message))}
             onDismissOrder={(orderId) => dismissOrder(orderId).catch((e) => alert(e.message))}
+            onCancelOrder={(orderId) => cancelOrder(orderId).catch((e) => alert(e.message))}
+            onCancelOrderItem={(itemId) => cancelOrderItem(itemId).catch((e) => alert(e.message))}
           />
         )}
       </section>

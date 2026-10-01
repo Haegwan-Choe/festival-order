@@ -121,6 +121,7 @@ REST 엔드포인트를 직접 만드는 대신, 클라이언트가 Supabase JS 
 | 주문 큐 조회 | `orders`+`order_item`+`menu_item` SELECT | 총괄, 주문서버, 주방 |
 | 입금 확인 | RPC `confirm_payment(order_id)` | `admins` 등록 여부 체크 후 order.payment_confirmed=true + 하위 order_item 전체 PENDING_PAYMENT→COOKING |
 | 조리 완료 | RPC `serve_item(item_id)` | COOKING→SERVED |
+| 주문 취소 | RPC `cancel_order(order_id)` / `cancel_order_item(item_id)` | **입금 확인 전**(`payment_confirmed=false` / `PENDING_PAYMENT`)일 때만 주문 전체 또는 메뉴 한 줄을 하드 삭제. 메뉴 한 줄 삭제 후 남은 항목이 없으면 주문도 삭제. 돈이 오가기 전이라 order_log에 남기지 않음. `orders` 행을 `FOR UPDATE`로 잠가 동시에 들어온 입금 확인과 직렬화. 손님(anon)은 호출 불가 — 다른 테이블 주문을 지울 수 있게 되므로 관리자만 |
 | 퇴석 처리 | RPC `checkout_table(zone, seat_number)` | 주문을 `order_log`(정산/사후 확인용 스냅샷, 메뉴명·가격은 퇴석 시점 값, 관리자만 조회 가능)에 복사한 뒤 주문 삭제 + dining_table.status→EMPTY, entered_at→null (총괄 전용) |
 | 메뉴 추가 | RPC `create_menu_item(name, price, category)` | 새 메뉴 등록 (available=true로 시작) |
 | 메뉴 수정 | RPC `update_menu_item(id, name, price, category, available)` | 가격 변경, 품절 처리(available=false) 등 |
@@ -188,8 +189,8 @@ REST 엔드포인트를 직접 만드는 대신, 클라이언트가 Supabase JS 
 
 | 화면 | 구성 | filterStatus | allowedActions |
 |---|---|---|---|
-| 총괄 `/admin/overview` | `SeatGrid` + `OrderQueue`(카드에 메뉴 합산 금액 표시, 3열 배치, 좁은 화면에선 세로 아코디언) | 전체 | 입금확인, 조리완료, 퇴석 |
-| 주문서버(서빙) `/admin/orders` | `OrderQueue`만(카드에 메뉴 합산 금액 표시) | 전체 (확인용) | 입금확인만 |
+| 총괄 `/admin/overview` | `SeatGrid` + `OrderQueue`(카드에 메뉴 합산 금액 표시, 3열 배치, 좁은 화면에선 세로 아코디언) | 전체 | 입금확인, 조리완료, 퇴석, 주문 취소(입금 전) |
+| 주문서버(서빙) `/admin/orders` | `OrderQueue`만(카드에 메뉴 합산 금액 표시) | 전체 (확인용) | 입금확인, 주문 취소(입금 전) |
 | 주방 `/admin/kitchen` | `OrderQueue`만 (노트북/태블릿 기준 확대 그리드 레이아웃) | `COOKING`만 | 조리완료(항목 체크)만 |
 
 ### 7-3. 총괄 화면 반응형 규칙
@@ -200,6 +201,7 @@ REST 엔드포인트를 직접 만드는 대신, 클라이언트가 Supabase JS 
 ### 7-4. 큐 카드 표시 규칙
 - 상태별 아이콘: 🟠 입금대기 → 🔥 조리중 → ✅ 완료(짧게 표시 후 자동 제거)
 - 🟠 입금대기 항목은 항상 최상단 고정, 그 외는 먼저 들어온 주문이 위로 (오래된 순 — 스크롤 안 내리고도 가장 오래 기다린 주문부터 처리하기 위함)
+- **주문 취소**(`cancelPending` 액션): 입금대기 카드 하단에 "주문 취소"(빨간 버튼, 주문 통째로 삭제), 각 🟠 메뉴 줄 오른쪽에 휴지통 버튼(그 메뉴만 삭제). 둘 다 확인 팝업을 거침
 - **연타 방지**: 조리완료/입금확인 버튼은 누르는 즉시 그 항목 id를 로컬 "처리 중" 집합에 넣고 비활성화, 응답 오면 해제(`OrderQueue.tsx`). RPC 자체도 `WHERE status='이전상태'` 조건이라 중복 호출이 와도 데이터는 안 깨짐 — 이건 순수 프론트 최적화
 
 ### 7-5. 듀라테이블
