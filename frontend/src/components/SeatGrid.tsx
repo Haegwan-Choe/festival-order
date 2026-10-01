@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { GROUP_COLOR_PALETTE } from '@/lib/groupColors'
 import { cn } from '@/lib/utils'
-import { formatTableLabel, type DiningTable } from '@/types/domain'
+import { compareZones, formatTableLabel, type DiningTable } from '@/types/domain'
 
 interface SeatGridProps {
   tables: DiningTable[]
@@ -22,7 +22,10 @@ interface SeatGridProps {
   onMerge?: (tables: DiningTable[]) => void
 }
 
+// 드래그로 옮길 자리를 위해 구역마다 테이블 아래에 빈 줄을 더 그린다.
+// A·C구역은 다음 구역이 너무 밀려 보여서 한 줄만.
 const GRID_ROW_BUFFER = 2
+const ZONE_ROW_BUFFER: Record<string, number> = { A: 1, C: 1 }
 const GRID_COL_BUFFER = 2
 
 function formatElapsed(enteredAt: string, now: Date) {
@@ -76,16 +79,16 @@ export function SeatGrid({ tables, onCheckout, onMove, onMerge }: SeatGridProps)
     }
   }
 
-  const zones = [...new Set(tables.map((table) => table.zone))].sort()
+  const zones = [...new Set(tables.map((table) => table.zone))].sort(compareZones)
+  // 모든 구역을 가장 넓은 구역과 같은 칸 수로 그린다 — 좌석이 적은 구역도 오른쪽으로 자유롭게 드래그할 수 있게.
+  const cols = Math.max(0, ...tables.map((table) => table.gridCol)) + 1 + GRID_COL_BUFFER
 
   return (
     <div className="space-y-6 overflow-x-auto pb-2">
       {zones.map((zone) => {
         const zoneTables = tables.filter((table) => table.zone === zone)
         const maxRow = Math.max(0, ...zoneTables.map((table) => table.gridRow))
-        const maxCol = Math.max(0, ...zoneTables.map((table) => table.gridCol))
-        const rows = maxRow + 1 + GRID_ROW_BUFFER
-        const cols = maxCol + 1 + GRID_COL_BUFFER
+        const rows = maxRow + 1 + (ZONE_ROW_BUFFER[zone] ?? GRID_ROW_BUFFER)
 
         return (
           <div key={zone} className="space-y-2">

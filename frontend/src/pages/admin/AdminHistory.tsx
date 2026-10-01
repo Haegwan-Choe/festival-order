@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useDismissedOrders } from '@/hooks/useDismissedOrders'
-import type { OrderView } from '@/types/domain'
+import { compareZones, type OrderView } from '@/types/domain'
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
@@ -16,7 +16,9 @@ function DismissedOrders() {
   for (const order of orders) {
     byTable.set(order.tableLabel, [...(byTable.get(order.tableLabel) ?? []), order])
   }
-  const tableLabels = [...byTable.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  const tableLabels = [...byTable.keys()].sort(
+    (a, b) => compareZones(a.split('-')[0], b.split('-')[0]) || a.localeCompare(b, undefined, { numeric: true }),
+  )
 
   return (
     <div className="space-y-4">

@@ -3,6 +3,7 @@
 
 -- 테이블 배치 확정본 (2026-09-22 기준, migrations/20260922100000_reseat_zones_and_dura_tables.sql와 동일 구조)
 -- 총 45석: A구역 26석(10+8+8 3블록), B구역 19석(일반 16 + 듀라 3)
+-- C구역 6석은 seed가 아니라 migrations/20261001120000_add_zone_c.sql에서 추가됨 (총 51석)
 -- 블록 사이 grid_col을 한 칸 띄워서 통로처럼 보이게 함
 insert into dining_table (zone, seat_number, status, grid_row, grid_col) values
   -- A구역: 블록1(1-10, col 0-4), 블록2(11-18, col 6-9), 블록3(19-26, col 11-14)

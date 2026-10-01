@@ -46,7 +46,7 @@
 | 필드 | 타입 | 설명 |
 |---|---|---|
 | id | bigint | PK |
-| zone | text | 구역(A/B 등). seat_number와 합쳐 `formatTableLabel`로 "A-1"처럼 표시되는 테이블의 정체성(QR코드·주문에 연결된 라벨) — 드래그로 위치를 옮겨도 바뀌지 않음 |
+| zone | text | 구역(A/B/C). 총괄 화면 표시 순서는 현장 배치대로 A → C → B (`ZONE_ORDER`, `types/domain.ts`). seat_number와 합쳐 `formatTableLabel`로 "A-1"처럼 표시되는 테이블의 정체성(QR코드·주문에 연결된 라벨) — 드래그로 위치를 옮겨도 바뀌지 않음 |
 | seat_number | integer | 구역 내 좌석 번호 (zone, seat_number) unique |
 | status | table_status enum | EMPTY / OCCUPIED |
 | table_type | dining_table_type enum | NORMAL / DURA — 듀라테이블(일반보다 큼)은 관리자 화면에서 더 크게 표시됨 |

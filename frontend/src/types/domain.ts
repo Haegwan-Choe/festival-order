@@ -44,6 +44,17 @@ export function formatTableLabel(zone: string, seatNumber: number): string {
   return `${zone}-${seatNumber}`
 }
 
+// 구역 표시 순서 = 현장 배치 순서 (C구역은 A와 B 사이에 있음). 여기 없는 구역은 뒤에 알파벳순.
+export const ZONE_ORDER = ['A', 'C', 'B']
+
+export function compareZones(a: string, b: string): number {
+  const rank = (zone: string) => {
+    const index = ZONE_ORDER.indexOf(zone)
+    return index === -1 ? ZONE_ORDER.length : index
+  }
+  return rank(a) - rank(b) || a.localeCompare(b)
+}
+
 export function parseTableLabel(label: string): { zone: string; seatNumber: number } | null {
   const match = /^([A-Za-z0-9]+)-(\d+)$/.exec(label)
   if (!match) return null
